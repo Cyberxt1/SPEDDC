@@ -242,6 +242,9 @@ function Header({ route, menuOpen, setMenuOpen, navigate }) {
               {item.label}
             </button>
           ))}
+          <button className="login-link" type="button" onClick={() => navigate("admin")}>
+            Login
+          </button>
         </nav>
       </div>
     </header>
@@ -264,7 +267,6 @@ function Home({ navigate }) {
     <div className="home-page">
       <section className="language-hero">
         <div className="language-copy" key={activeMessage.language}>
-          <p className="eyebrow">Federal College of Education (Special), Oyo</p>
           <span className="language-pill">{activeMessage.language}</span>
           <strong className="language-greeting">{activeMessage.greeting}</strong>
           <h1>{activeMessage.title}</h1>
@@ -283,6 +285,24 @@ function Home({ navigate }) {
             <span className={index === messageIndex ? "active" : ""} key={item.language}>
               {item.language}
             </span>
+          ))}
+        </div>
+      </section>
+
+      <section className="what-we-do">
+        <div className="section-heading">
+          <p className="eyebrow">What We Do</p>
+          <h2>Our core services</h2>
+        </div>
+        <div className="what-grid">
+          {serviceAreas.map(({ title, description, icon: Icon }) => (
+            <article key={title}>
+              <Icon size={22} />
+              <div>
+                <h3>{title}</h3>
+                <p>{description}</p>
+              </div>
+            </article>
           ))}
         </div>
       </section>
