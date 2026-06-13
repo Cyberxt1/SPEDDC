@@ -2927,6 +2927,13 @@ main {
   font-weight: 800;
 }
 
+.welcome-line {
+  margin: 0 0 18px;
+  color: #064d24;
+  font-size: clamp(0.95rem, 1.4vw, 1.12rem);
+  font-weight: 800;
+}
+
 .language-greeting {
   margin-bottom: 14px;
   color: #064d24;
@@ -2967,7 +2974,7 @@ main {
   gap: 10px;
 }
 
-.language-dots span {
+.language-dots button {
   display: inline-flex;
   align-items: center;
   min-height: 34px;
@@ -2978,12 +2985,24 @@ main {
   background: #fff;
   font-size: 0.78rem;
   font-weight: 800;
+  cursor: pointer;
   transition: color 180ms ease, background 180ms ease, border-color 180ms ease;
 }
 
-.language-dots span.active {
+.language-dots button.active {
   color: #fff;
   border-color: #064d24;
+  background: #064d24;
+}
+
+.language-dots button:hover {
+  color: #064d24;
+  border-color: #b6d2bf;
+  background: #f6faf7;
+}
+
+.language-dots button.active:hover {
+  color: #fff;
   background: #064d24;
 }
 

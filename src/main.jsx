@@ -255,18 +255,11 @@ function Home({ navigate }) {
   const [messageIndex, setMessageIndex] = useState(0);
   const activeMessage = languageMessages[messageIndex];
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setMessageIndex((index) => (index + 1) % languageMessages.length);
-    }, 3600);
-
-    return () => window.clearInterval(timer);
-  }, []);
-
   return (
     <div className="home-page">
       <section className="language-hero">
         <div className="language-copy" key={activeMessage.language}>
+          <p className="welcome-line">Welcome to Special Needs Diagnosis and Therapy Center</p>
           <span className="language-pill">{activeMessage.language}</span>
           <strong className="language-greeting">{activeMessage.greeting}</strong>
           <h1>{activeMessage.title}</h1>
@@ -282,9 +275,14 @@ function Home({ navigate }) {
         </div>
         <div className="language-dots" aria-label="Language rotation">
           {languageMessages.map((item, index) => (
-            <span className={index === messageIndex ? "active" : ""} key={item.language}>
+            <button
+              className={index === messageIndex ? "active" : ""}
+              key={item.language}
+              type="button"
+              onClick={() => setMessageIndex(index)}
+            >
               {item.language}
-            </span>
+            </button>
           ))}
         </div>
       </section>
