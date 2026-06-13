@@ -32,7 +32,7 @@ const STORAGE = {
 
 const routes = [
   { id: "home", label: "Home", path: "/" },
-  { id: "request", label: "Intake", path: "/request" },
+  { id: "request", label: "Request", path: "/request" },
   { id: "result", label: "Results", path: "/result" },
   { id: "contact", label: "Contact", path: "/contact" },
   { id: "admin", label: "Staff Workspace", path: "/admin" }
@@ -334,14 +334,14 @@ function RequestPage({ setRequests, navigate }) {
       ...items
     ]);
     form.reset();
-    setMessage("Intake submitted. Staff can now review this request in the workspace.");
+    setMessage("Request submitted. Staff can now review this request in the workspace.");
   }
 
   return (
     <section className="app-page request-page">
       <div className="page-lead">
-        <p className="eyebrow">Appointment Request</p>
-        <h1>Book an Appointment</h1>
+        <p className="eyebrow">Service Request</p>
+        <h1>Submit a Request</h1>
       </div>
       <div className="intake-layout">
         <form className="surface intake-card form-grid" onSubmit={submitRequest}>
@@ -391,7 +391,7 @@ function RequestPage({ setRequests, navigate }) {
           </label>
           <div className="form-footer wide">
             <button className="button primary" type="submit">
-              Submit Intake <ArrowRight size={18} />
+              Submit Request <ArrowRight size={18} />
             </button>
             <button className="button ghost" type="button" onClick={() => navigate("contact")}>
               Contact Help Desk
@@ -460,9 +460,9 @@ function ResultCard({ result, navigate }) {
       <aside className="result-card">
         <X size={30} />
         <h2>No matching record</h2>
-        <p>The details do not match a client record. Book an intake or contact the center for support.</p>
+        <p>The details do not match a client record. Submit a request or contact the center for support.</p>
         <button className="button ghost" type="button" onClick={() => navigate("request")}>
-          Book Intake
+          Submit Request
         </button>
       </aside>
     );
@@ -501,7 +501,7 @@ function ContactPage({ navigate }) {
       <div className="page-lead">
         <p className="eyebrow">Contact the center</p>
         <h1>For appointments, referrals, result support, and care coordination.</h1>
-        <p>Clients, caregivers, and schools can reach the center after submitting intake or when they need report access help.</p>
+        <p>Clients, caregivers, and schools can reach the center after submitting a request or when they need report access help.</p>
       </div>
       <div className="contact-grid">
         <article className="surface contact-card">
@@ -526,10 +526,10 @@ function ContactPage({ navigate }) {
       <section className="contact-action">
         <div>
           <p className="eyebrow">Best first step</p>
-          <h2>Submit an intake so staff can respond with useful context.</h2>
+          <h2>Submit a request so staff can respond with useful context.</h2>
         </div>
         <button className="button primary" type="button" onClick={() => navigate("request")}>
-          Book Intake
+          Submit Request
         </button>
       </section>
     </section>
@@ -538,7 +538,7 @@ function ContactPage({ navigate }) {
 
 function AdminPage({ clients, setClients, requests, setRequests, navigate }) {
   const [view, setView] = useState("overview");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia("(min-width: 981px)").matches);
   const [clientSearch, setClientSearch] = useState("");
   const [requestSearch, setRequestSearch] = useState("");
   const [editing, setEditing] = useState(null);
@@ -589,23 +589,34 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate }) {
     setRequests((items) => items.map((item) => (item.id === id ? { ...item, status } : item)));
   }
 
+  function openAdminView(nextView) {
+    setView(nextView);
+    setSidebarOpen(false);
+  }
+
   return (
     <section className={`ops-page ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}>
+      {sidebarOpen && (
+        <button className="sidebar-backdrop" type="button" aria-label="Close sidebar" onClick={() => setSidebarOpen(false)} />
+      )}
       <aside className={`ops-sidebar ${sidebarOpen ? "open" : ""}`} aria-label="Admin navigation">
         <div className="sidebar-head">
           <button className="admin-brand" type="button" onClick={() => navigate("home")}>
             <span>SD</span>
-            <strong>Center Ops</strong>
+            <strong>Admin Workspace</strong>
+          </button>
+          <button className="sidebar-close" type="button" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar">
+            <X size={18} />
           </button>
         </div>
         <nav>
           {[
             ["overview", "Overview", BarChart3],
-            ["requests", "Intake Queue", CalendarCheck],
+            ["requests", "Request Queue", CalendarCheck],
             ["clients", "Client Records", UsersRound],
             ["reports", "Report Setup", FileCheck2]
           ].map(([id, label, Icon]) => (
-            <button className={view === id ? "active" : ""} key={id} type="button" onClick={() => setView(id)}>
+            <button className={view === id ? "active" : ""} key={id} type="button" onClick={() => openAdminView(id)}>
               <Icon size={18} />
               {label}
             </button>
@@ -622,8 +633,16 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate }) {
             <button className="sidebar-toggle" type="button" onClick={() => setSidebarOpen((open) => !open)} aria-label="Toggle sidebar">
               {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
-            <strong>Staff Workspace</strong>
-            <span>{new Date().toLocaleDateString("en-NG", { weekday: "short", month: "short", day: "numeric" })}</span>
+            <div className="ops-title-block">
+              <strong>Admin Workspace</strong>
+              <span>Manage requests, clients, reports, and center activity</span>
+            </div>
+            <div className="ops-header-actions">
+              <button type="button" onClick={() => setView("requests")}>Requests</button>
+              <button type="button" onClick={() => setView("clients")}>Clients</button>
+              <button type="button" onClick={() => setView("reports")}>Upload Report</button>
+            </div>
+            <time>{new Date().toLocaleDateString("en-NG", { weekday: "short", month: "short", day: "numeric" })}</time>
           </div>
          
         </header>
@@ -668,7 +687,7 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate }) {
 
         {view === "requests" && (
           <section className="surface board-panel">
-            <BoardHeader title="Intake queue" eyebrow="Requests" value={requestSearch} onChange={setRequestSearch} placeholder="Search requests" />
+            <BoardHeader title="Request queue" eyebrow="Requests" value={requestSearch} onChange={setRequestSearch} placeholder="Search requests" />
             <RequestBoard requests={filteredRequests} updateRequest={updateRequest} setRequests={setRequests} />
           </section>
         )}
@@ -875,25 +894,31 @@ function Metric({ icon: Icon, label, value }) {
 function Footer({ navigate }) {
   return (
     <footer className="site-footer">
-      <div className="footer-brand">
-        <span className="footer-mark">SD</span>
-        <div>
-          <strong>Special Needs Diagnosis and Therapy Center</strong>
-          <small>Federal College of Education (Special), Oyo</small>
+      <div className="footer-top">
+        <div className="footer-brand">
+          <span className="footer-mark">SD</span>
+          <div>
+            <strong>Special Needs Diagnosis and Therapy Center</strong>
+            <small>Federal College of Education (Special), Oyo</small>
+          </div>
+          <p>Providing assessment, diagnosis, therapy, consultation, and professional support services for individuals, families, schools, and communities.</p>
         </div>
-        <p>Providing assessment, diagnosis, therapy, consultation, and professional support services for individuals, families, schools, and communities.</p>
+        <div className="footer-contact">
+          <span>Contact</span>
+          <p>Phone Number</p>
+          <p>Email Address</p>
+          <p>Office Address</p>
+        </div>
+        <div className="footer-links">
+          <span>Quick Links</span>
+          <button type="button" onClick={() => navigate("request")}>Submit Request</button>
+          <button type="button" onClick={() => navigate("result")}>Access Results</button>
+          <button type="button" onClick={() => navigate("contact")}>Contact</button>
+        </div>
       </div>
-      <div className="footer-contact">
-        <span>Contact</span>
-        <p>Phone Number</p>
-        <p>Email Address</p>
-        <p>Office Address</p>
-      </div>
-      <div className="footer-links">
-        <span>Quick Links</span>
-        <button type="button" onClick={() => navigate("request")}>Book an Appointment</button>
-        <button type="button" onClick={() => navigate("result")}>Access Results</button>
-        <button type="button" onClick={() => navigate("contact")}>Contact</button>
+      <div className="footer-bottom">
+        <span>Copyright © 2026 Special Needs Diagnosis and Therapy Center</span>
+        <button type="button" onClick={() => navigate("request")}>Submit Request</button>
       </div>
     </footer>
   );
