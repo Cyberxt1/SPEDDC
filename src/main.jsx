@@ -23,6 +23,7 @@ import {
   UsersRound,
   X
 } from "lucide-react";
+import heroBackground from "../images.jpg";
 import "./styles.css";
 
 const STORAGE = {
@@ -222,7 +223,6 @@ function Header({ route, menuOpen, setMenuOpen, navigate }) {
       </div>
       <div className="header-main">
         <button className="brand" type="button" onClick={() => navigate("home")} aria-label="Go to home">
-          <span className="brand-mark">SD</span>
           <span>
             <strong>Special Needs Diagnosis and Therapy Center</strong>
             <small>Assessment, therapy, consultation, reports</small>
@@ -256,53 +256,116 @@ function Home({ navigate }) {
   const activeMessage = languageMessages[messageIndex];
 
   return (
-    <div className="home-page">
-      <section className="language-hero">
-        <div className="language-copy" key={activeMessage.language}>
-          <p className="welcome-line">Welcome to Special Needs Diagnosis and Therapy Center</p>
-          <span className="language-pill">{activeMessage.language}</span>
-          <strong className="language-greeting">{activeMessage.greeting}</strong>
-          <h1>{activeMessage.title}</h1>
-          <p>{activeMessage.copy}</p>
+    <div className="home-page redesigned-home">
+      <section className="hero-redesign" style={{ "--hero-bg": `url(${heroBackground})` }}>
+        <div className="hero-redesign-copy" key={activeMessage.language}>
+          <h1>Special Needs Diagnosis and Therapy Center</h1>
+          <p className="hero-lede">
+            A calm, professional center for assessment, therapy, consultation, family guidance, and secure report access.
+          </p>
+
+          <div className="language-card">
+            <div>
+              <span>{activeMessage.language}</span>
+              <strong>{activeMessage.greeting}</strong>
+            </div>
+            <p>{activeMessage.copy}</p>
+          </div>
+
           <div className="hero-actions">
             <button className="button primary" type="button" onClick={() => navigate("request")}>
-              Book an Appointment <ArrowRight size={18} />
+              Submit Request <ArrowRight size={18} />
             </button>
             <button className="button ghost warm" type="button" onClick={() => navigate("result")}>
               Access Results
             </button>
           </div>
+
+          <div className="language-dots refined" aria-label="Choose language">
+            {languageMessages.map((item, index) => (
+              <button
+                className={index === messageIndex ? "active" : ""}
+                key={item.language}
+                type="button"
+                onClick={() => setMessageIndex(index)}
+              >
+                {item.language}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="language-dots" aria-label="Language rotation">
-          {languageMessages.map((item, index) => (
-            <button
-              className={index === messageIndex ? "active" : ""}
-              key={item.language}
-              type="button"
-              onClick={() => setMessageIndex(index)}
-            >
-              {item.language}
-            </button>
+
+        <div className="hero-quick-panel" aria-label="Center highlights">
+          <article>
+            <FileCheck2 size={22} />
+            <strong>Secure reports</strong>
+            <span>Private online access for released results.</span>
+          </article>
+          <article>
+            <UsersRound size={22} />
+            <strong>Family guidance</strong>
+            <span>Clear next steps for parents and caregivers.</span>
+          </article>
+        </div>
+
+        <div className="trust-strip hero-trust-strip">
+          <article>
+            <strong>Assessment</strong>
+            <span>Learning, speech, developmental, and behavioural needs</span>
+          </article>
+          <article>
+            <strong>Therapy</strong>
+            <span>Structured intervention and support programmes</span>
+          </article>
+          <article>
+            <strong>Consultation</strong>
+            <span>Guidance for families, schools, and organizations</span>
+          </article>
+        </div>
+      </section>
+
+      <section className="design-section services-redesign">
+        <div className="design-heading">
+          <p>What we do</p>
+          <h2>Services built around clarity, care, and practical decisions.</h2>
+        </div>
+        <div className="services-redesign-grid">
+          {serviceAreas.map(({ title, description, icon: Icon }) => (
+            <article key={title}>
+              <Icon size={22} />
+              <h3>{title}</h3>
+              <p>{description}</p>
+            </article>
           ))}
         </div>
       </section>
 
-      <section className="what-we-do">
-        <div className="section-heading">
-          <p className="eyebrow">What We Do</p>
-          <h2>Our core services</h2>
+      <section className="design-section split-redesign">
+        <div>
+          <p className="eyebrow">Who we support</p>
+          <h2>For individuals, families, schools, and professional bodies.</h2>
+          <p>
+            The center helps people understand needs, document findings, and determine appropriate support pathways.
+          </p>
         </div>
-        <div className="what-grid">
-          {serviceAreas.map(({ title, description, icon: Icon }) => (
-            <article key={title}>
-              <Icon size={22} />
-              <div>
-                <h3>{title}</h3>
-                <p>{description}</p>
-              </div>
-            </article>
+        <div className="audience-list">
+          {servedGroups.map((group) => (
+            <span key={group}>{group}</span>
           ))}
         </div>
+      </section>
+
+      <section className="report-band">
+        <div>
+          <p className="eyebrow">Result access</p>
+          <h2>Completed reports can be accessed securely online.</h2>
+          <p>
+            Clients with assigned credentials can check report availability and download released PDF documents.
+          </p>
+        </div>
+        <button className="button light" type="button" onClick={() => navigate("result")}>
+          Access Results
+        </button>
       </section>
     </div>
   );
@@ -600,7 +663,6 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate }) {
       <aside className={`ops-sidebar ${sidebarOpen ? "open" : ""}`} aria-label="Admin navigation">
         <div className="sidebar-head">
           <button className="admin-brand" type="button" onClick={() => navigate("home")}>
-            <span>SD</span>
             <strong>Admin Workspace</strong>
           </button>
           <button className="sidebar-close" type="button" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar">
@@ -894,7 +956,6 @@ function Footer({ navigate }) {
     <footer className="site-footer">
       <div className="footer-top">
         <div className="footer-brand">
-          <span className="footer-mark">SD</span>
           <div>
             <strong>Special Needs Diagnosis and Therapy Center</strong>
             <small>Federal College of Education (Special), Oyo</small>
@@ -902,10 +963,10 @@ function Footer({ navigate }) {
           <p>Providing assessment, diagnosis, therapy, consultation, and professional support services for individuals, families, schools, and communities.</p>
         </div>
         <div className="footer-contact">
-          <span>Contact</span>
-          <p>Phone Number</p>
-          <p>Email Address</p>
-          <p>Office Address</p>
+          <span>Services</span>
+          <p>Diagnostic Assessment</p>
+          <p>Therapy Services</p>
+          <p>Consultation Services</p>
         </div>
         <div className="footer-links">
           <span>Quick Links</span>
@@ -915,7 +976,7 @@ function Footer({ navigate }) {
         </div>
       </div>
       <div className="footer-bottom">
-        <span>Copyright © 2026 Special Needs Diagnosis and Therapy Center</span>
+        <span>Copyright (c) 2026 Special Needs Diagnosis and Therapy Center</span>
         <button type="button" onClick={() => navigate("request")}>Submit Request</button>
       </div>
     </footer>
