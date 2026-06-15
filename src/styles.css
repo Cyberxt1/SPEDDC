@@ -5631,6 +5631,20 @@ tr:hover td {
   .sidebar-toggle {
     display: grid;
   }
+
+  .ops-sidebar nav {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .ops-sidebar nav button {
+    display: flex;
+    width: 100%;
+    min-height: 42px;
+    align-items: center;
+    justify-content: flex-start;
+  }
 }
 
 /* Admin overview compaction, quick actions, and sidebar rhythm. */
@@ -5646,8 +5660,19 @@ tr:hover td {
 
 .ops-sidebar nav button,
 .ops-sidebar > .button {
+  display: flex;
+  grid-template-columns: none;
+  align-items: center;
   width: 100%;
   justify-content: flex-start;
+  min-height: 42px;
+  text-align: left;
+  white-space: normal;
+}
+
+.ops-sidebar nav button svg,
+.ops-sidebar > .button svg {
+  flex: 0 0 auto;
 }
 
 .ops-sidebar > .button:first-of-type {
@@ -5679,16 +5704,35 @@ tr:hover td {
 }
 
 .kanban.compact .request-card {
-  min-height: auto;
-  padding: 10px;
+  min-height: 58px;
+  padding: 12px;
   border: 1px solid #dce8df;
   background: #fff;
 }
 
 .overview-request-row {
   display: grid;
-  gap: 3px;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
   min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.overview-request-row > span {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  background: #e6f3ea;
+  color: #064d24;
+  font-size: 0.76rem;
+  font-weight: 800;
 }
 
 .overview-request-row strong {
@@ -5696,15 +5740,6 @@ tr:hover td {
   color: #050505;
   font-size: 0.9rem;
   line-height: 1.16;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.overview-request-row span {
-  overflow: hidden;
-  color: #5d685f;
-  font-size: 0.78rem;
-  font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

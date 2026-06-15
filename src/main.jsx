@@ -1105,14 +1105,6 @@ function AdminPage({ clients, setClients, requests, setRequests, clientLogs, set
     };
   }, [session, setClients, setRequests, setClientLogs]);
 
-  if (supabaseEnabled && !authReady) {
-    return <AdminLoading navigate={navigate} />;
-  }
-
-  if (supabaseEnabled && !session) {
-    return <AdminLogin navigate={navigate} setSession={setSession} />;
-  }
-
   const stats = useMemo(() => {
     const ready = clients.filter((client) => client.status === "ready").length;
     const open = requests.filter((request) => request.status !== "Completed").length;
@@ -1130,6 +1122,14 @@ function AdminPage({ clients, setClients, requests, setRequests, clientLogs, set
       normalize(value).includes(normalize(requestSearch))
     )
   );
+
+  if (supabaseEnabled && !authReady) {
+    return <AdminLoading navigate={navigate} />;
+  }
+
+  if (supabaseEnabled && !session) {
+    return <AdminLogin navigate={navigate} setSession={setSession} />;
+  }
 
   async function saveClient(event) {
     event.preventDefault();
@@ -1591,12 +1591,12 @@ function RequestBoard({ requests, updateRequest, deleteRequest, isPending = () =
             <span>{requests.filter((request) => request.status === column).length}</span>
           </div>
           <div className="kanban-stack">
-            {requests.filter((request) => request.status === column).map((request) => (
+            {requests.filter((request) => request.status === column).map((request, index) => (
               <article className="request-card" key={request.id}>
                 {compact ? (
                   <button className="overview-request-row" type="button" onClick={() => onOpenRequest?.(request)}>
+                    <span>{index + 1}</span>
                     <strong>{request.name}</strong>
-                    <span>{request.phone}</span>
                   </button>
                 ) : (
                   <>
@@ -1610,26 +1610,28 @@ function RequestBoard({ requests, updateRequest, deleteRequest, isPending = () =
                     {request.note && <blockquote>{request.note}</blockquote>}
                   </>
                 )}
-                <div className="request-actions">
-                  <select
-                    value={request.status}
-                    onChange={(event) => updateRequest(request.id, event.target.value)}
-                    disabled={isPending(`request-status-${request.id}`)}
-                  >
-                    {columns.map((status) => (
-                      <option key={status}>{status}</option>
-                    ))}
-                  </select>
-                  <button
-                    className="mini-button danger"
-                    type="button"
-                    onClick={() => deleteRequest(request.id)}
-                    disabled={isPending(`request-delete-${request.id}`)}
-                    aria-busy={isPending(`request-delete-${request.id}`)}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
+                {!compact && (
+                  <div className="request-actions">
+                    <select
+                      value={request.status}
+                      onChange={(event) => updateRequest(request.id, event.target.value)}
+                      disabled={isPending(`request-status-${request.id}`)}
+                    >
+                      {columns.map((status) => (
+                        <option key={status}>{status}</option>
+                      ))}
+                    </select>
+                    <button
+                      className="mini-button danger"
+                      type="button"
+                      onClick={() => deleteRequest(request.id)}
+                      disabled={isPending(`request-delete-${request.id}`)}
+                      aria-busy={isPending(`request-delete-${request.id}`)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                )}
               </article>
             ))}
             {!requests.filter((request) => request.status === column).length && <p className="empty-note">No {column.toLowerCase()} requests.</p>}
