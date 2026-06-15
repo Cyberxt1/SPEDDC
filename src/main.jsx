@@ -23,8 +23,16 @@ import {
   UsersRound,
   X
 } from "lucide-react";
-import heroBackground from "../images.jpg";
+import { createClient } from "@supabase/supabase-js";
+import heroBackground from "../images.png";
 import "./styles.css";
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseEnabled = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+const supabase = supabaseEnabled ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const REPORT_BUCKET = "reports";
+const REPORT_TTL_DAYS = 30;
 
 const STORAGE = {
   clients: "sndtc_clients",
@@ -141,13 +149,211 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+function daysFromNow(days) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString();
+}
+
+function storageFileName(fileName) {
+  const parts = String(fileName || "report.pdf").split(".");
+  const ext = parts.length > 1 ? parts.pop().toLowerCase() : "pdf";
+  const base = safeFileName(parts.join(".") || "report");
+  return `${base}.${ext === "pdf" ? "pdf" : ext}`;
+}
+
+function toRequest(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    phone: row.phone,
+    service: row.service,
+    urgency: row.urgency,
+    clientType: row.client_type,
+    note: row.note,
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function toClient(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    phone: row.phone,
+    password: row.result_password,
+    status: row.status,
+    reportPath: row.report_path,
+    pdfName: row.report_name,
+    reportUploadedAt: row.report_uploaded_at,
+    reportExpiresAt: row.report_expires_at,
+    updatedAt: row.updated_at
+  };
+}
+
+async function submitServiceRequest(data) {
+  const request = {
+    id: makeId("request"),
+    name: data.name.trim(),
+    email: data.email.trim(),
+    phone: data.phone.trim(),
+    service: data.service,
+    urgency: data.urgency,
+    clientType: data.clientType,
+    note: data.note.trim(),
+    status: "New",
+    createdAt: new Date().toISOString()
+  };
+
+  const record = {
+    name: request.name,
+    email: request.email,
+    phone: request.phone,
+    service: request.service,
+    urgency: request.urgency,
+    client_type: request.clientType,
+    note: request.note,
+    status: "New"
+  };
+
+  if (!supabaseEnabled) {
+    return request;
+  }
+
+  const { error } = await supabase.from("service_requests").insert(record);
+
+  if (error) throw error;
+  return request;
+}
+
+async function fetchAdminData() {
+  if (!supabaseEnabled) {
+    return {
+      clients: load(STORAGE.clients, []),
+      requests: load(STORAGE.requests, [])
+    };
+  }
+
+  const [{ data: clients, error: clientsError }, { data: requests, error: requestsError }] = await Promise.all([
+    supabase.from("clients").select("*").order("updated_at", { ascending: false }),
+    supabase.from("service_requests").select("*").order("created_at", { ascending: false })
+  ]);
+
+  if (clientsError) throw clientsError;
+  if (requestsError) throw requestsError;
+
+  return {
+    clients: (clients || []).map(toClient),
+    requests: (requests || []).map(toRequest)
+  };
+}
+
+async function saveClientRecord(data, file, existing) {
+  if (!supabaseEnabled) {
+    return {
+      id: data.id || makeId("client"),
+      name: data.name.trim(),
+      email: data.email.trim(),
+      phone: data.phone.trim(),
+      password: data.password.trim(),
+      status: data.status,
+      reportPath: existing?.reportPath || "",
+      pdfName: file?.name || existing?.pdfName || "",
+      reportUploadedAt: file ? new Date().toISOString() : existing?.reportUploadedAt || "",
+      reportExpiresAt: file ? daysFromNow(REPORT_TTL_DAYS) : existing?.reportExpiresAt || "",
+      updatedAt: new Date().toISOString()
+    };
+  }
+
+  const id = data.id || crypto.randomUUID();
+  let reportPath = existing?.reportPath || null;
+  let reportName = existing?.pdfName || null;
+  let reportUploadedAt = existing?.reportUploadedAt || null;
+  let reportExpiresAt = existing?.reportExpiresAt || null;
+
+  if (file) {
+    if (existing?.reportPath) {
+      await supabase.storage.from(REPORT_BUCKET).remove([existing.reportPath]);
+    }
+
+    reportPath = `${id}/${Date.now()}-${storageFileName(file.name)}`;
+    const { error: uploadError } = await supabase.storage
+      .from(REPORT_BUCKET)
+      .upload(reportPath, file, { contentType: "application/pdf", upsert: false });
+
+    if (uploadError) throw uploadError;
+
+    reportName = file.name;
+    reportUploadedAt = new Date().toISOString();
+    reportExpiresAt = daysFromNow(REPORT_TTL_DAYS);
+  }
+
+  const payload = {
+    id,
+    name: data.name.trim(),
+    email: data.email.trim(),
+    phone: data.phone.trim(),
+    result_password: data.password.trim(),
+    status: data.status,
+    report_path: reportPath,
+    report_name: reportName,
+    report_uploaded_at: reportUploadedAt,
+    report_expires_at: reportExpiresAt
+  };
+
+  const { data: saved, error } = await supabase
+    .from("clients")
+    .upsert(payload)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return toClient(saved);
+}
+
+async function updateRequestStatus(id, status) {
+  if (!supabaseEnabled) return;
+  const { error } = await supabase.from("service_requests").update({ status }).eq("id", id);
+  if (error) throw error;
+}
+
+async function deleteRequestRecord(id) {
+  if (!supabaseEnabled) return;
+  const { error } = await supabase.from("service_requests").delete().eq("id", id);
+  if (error) throw error;
+}
+
+async function deleteClientRecord(client) {
+  if (!supabaseEnabled) return;
+  if (client.reportPath) {
+    await supabase.storage.from(REPORT_BUCKET).remove([client.reportPath]);
+  }
+  const { error } = await supabase.from("clients").delete().eq("id", client.id);
+  if (error) throw error;
+}
+
+async function getReportUrl(client) {
+  if (!client?.reportPath || !supabaseEnabled) return "";
+  const { data, error } = await supabase.storage.from(REPORT_BUCKET).createSignedUrl(client.reportPath, 60 * 10);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+async function verifyResult(phone, password, localClients) {
+  if (!supabaseEnabled) {
+    const client = localClients.find((record) => normalize(record.phone) === normalize(phone) && record.password === String(password || ""));
+    return client ? { ...client, signedUrl: "" } : null;
+  }
+
+  const { data, error } = await supabase.functions.invoke("verify-result-access", {
+    body: { phone, password }
   });
+
+  if (error) throw error;
+  return data?.record || null;
 }
 
 function routeFromLocation() {
@@ -171,8 +377,9 @@ function pathForRoute(route) {
 function App() {
   const [route, setRoute] = useState(routeFromLocation);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [clients, setClients] = useState(() => load(STORAGE.clients, []));
-  const [requests, setRequests] = useState(() => load(STORAGE.requests, []));
+  const [clients, setClients] = useState(() => (supabaseEnabled ? [] : load(STORAGE.clients, [])));
+  const [requests, setRequests] = useState(() => (supabaseEnabled ? [] : load(STORAGE.requests, [])));
+  const [session, setSession] = useState(null);
 
   useEffect(() => {
     const onPop = () => setRoute(routeFromLocation());
@@ -180,8 +387,35 @@ function App() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  useEffect(() => save(STORAGE.clients, clients), [clients]);
-  useEffect(() => save(STORAGE.requests, requests), [requests]);
+  useEffect(() => {
+    if (!supabaseEnabled) {
+      save(STORAGE.clients, clients);
+    }
+  }, [clients]);
+
+  useEffect(() => {
+    if (!supabaseEnabled) {
+      save(STORAGE.requests, requests);
+    }
+  }, [requests]);
+
+  useEffect(() => {
+    if (!supabaseEnabled) return;
+    let active = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (active) setSession(data.session);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+    });
+
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
 
   function navigate(nextRoute) {
     setMenuOpen(false);
@@ -204,7 +438,15 @@ function App() {
         {route === "result" && <ResultPage clients={clients} navigate={navigate} />}
         {route === "contact" && <ContactPage navigate={navigate} />}
         {route === "admin" && (
-          <AdminPage clients={clients} setClients={setClients} requests={requests} setRequests={setRequests} navigate={navigate} />
+          <AdminPage
+            clients={clients}
+            setClients={setClients}
+            requests={requests}
+            setRequests={setRequests}
+            navigate={navigate}
+            session={session}
+            setSession={setSession}
+          />
         )}
       </main>
       {route !== "admin" && <Footer navigate={navigate} />}
@@ -374,28 +616,24 @@ function Home({ navigate }) {
 
 function RequestPage({ setRequests, navigate }) {
   const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  function submitRequest(event) {
+  async function submitRequest(event) {
     event.preventDefault();
     const form = event.currentTarget;
     const data = Object.fromEntries(new FormData(form).entries());
-    setRequests((items) => [
-      {
-        id: makeId("request"),
-        name: data.name.trim(),
-        email: data.email.trim(),
-        phone: data.phone.trim(),
-        service: data.service,
-        urgency: data.urgency,
-        clientType: data.clientType,
-        note: data.note.trim(),
-        status: "New",
-        createdAt: new Date().toISOString()
-      },
-      ...items
-    ]);
-    form.reset();
-    setMessage("Request submitted. Staff can now review this request in the workspace.");
+    setSubmitting(true);
+    setMessage("");
+    try {
+      const request = await submitServiceRequest(data);
+      setRequests((items) => [request, ...items]);
+      form.reset();
+      setMessage("Request submitted. Staff can now review this request in the workspace.");
+    } catch (error) {
+      setMessage(error.message || "Could not submit request. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -452,7 +690,7 @@ function RequestPage({ setRequests, navigate }) {
           </label>
           <div className="form-footer wide">
             <button className="button primary" type="submit">
-              Submit Request <ArrowRight size={18} />
+              {submitting ? "Submitting..." : "Submit Request"} <ArrowRight size={18} />
             </button>
             <button className="button ghost" type="button" onClick={() => navigate("contact")}>
               Contact Help Desk
@@ -467,15 +705,23 @@ function RequestPage({ setRequests, navigate }) {
 
 function ResultPage({ clients, navigate }) {
   const [result, setResult] = useState(null);
+  const [message, setMessage] = useState("");
+  const [checking, setChecking] = useState(false);
 
-  function checkResult(event) {
+  async function checkResult(event) {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget).entries());
-    const phone = normalize(data.phone);
-    const client = clients.find((record) => {
-      return normalize(record.phone) === phone && record.password === String(data.password || "");
-    });
-    setResult(client || false);
+    setChecking(true);
+    setMessage("");
+    try {
+      const record = await verifyResult(data.phone, data.password, clients);
+      setResult(record || false);
+    } catch (error) {
+      setResult(false);
+      setMessage(error.message || "Could not check the result right now.");
+    } finally {
+      setChecking(false);
+    }
   }
 
   return (
@@ -496,8 +742,9 @@ function ResultPage({ clients, navigate }) {
             <input name="password" type="password" required />
           </label>
           <button className="button primary" type="submit">
-            Check Result <Search size={18} />
+            {checking ? "Checking..." : "Check Result"} <Search size={18} />
           </button>
+          <p className="form-message" role="status">{message}</p>
         </form>
         <ResultCard result={result} navigate={navigate} />
       </div>
@@ -529,7 +776,7 @@ function ResultCard({ result, navigate }) {
     );
   }
 
-  if (result.status !== "ready" || !result.pdfData) {
+  if (result.status !== "ready" || (!result.signedUrl && !result.pdfData)) {
     return (
       <aside className="result-card">
         <Activity size={30} />
@@ -544,11 +791,12 @@ function ResultCard({ result, navigate }) {
       <CheckCircle2 size={30} />
       <h2>Report ready</h2>
       <p>{result.name}, your PDF report is available for viewing or download.</p>
+      {result.reportExpiresAt && <p>This file reference expires on {formatDate(result.reportExpiresAt)}.</p>}
       <div className="result-actions">
-        <a className="button primary" href={result.pdfData} target="_blank" rel="noreferrer">
+        <a className="button primary" href={result.signedUrl || result.pdfData} target="_blank" rel="noreferrer">
           View PDF
         </a>
-        <a className="button ghost" href={result.pdfData} download={`${safeFileName(result.name)}-result.pdf`}>
+        <a className="button ghost" href={result.signedUrl || result.pdfData} download={result.reportName || `${safeFileName(result.name)}-result.pdf`}>
           Download
         </a>
       </div>
@@ -597,19 +845,101 @@ function ContactPage({ navigate }) {
   );
 }
 
-function AdminPage({ clients, setClients, requests, setRequests, navigate }) {
+function AdminLogin({ navigate, setSession }) {
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function signIn(event) {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget).entries());
+    setSubmitting(true);
+    setMessage("");
+
+    try {
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
+        email: data.email.trim(),
+        password: data.password
+      });
+
+      if (error) throw error;
+      setSession(authData.session);
+    } catch (error) {
+      setMessage(error.message || "Could not sign in.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <section className="app-page admin-login-page">
+      <div className="page-lead compact">
+        <p className="eyebrow">Staff access</p>
+        <h1>Sign in to manage the portal.</h1>
+        <p>Authorized staff can manage requests, client records, report references, and private report files.</p>
+      </div>
+      <form className="surface lookup-card stacked-form" onSubmit={signIn}>
+        <label>
+          Email address
+          <input name="email" type="email" autoComplete="email" required />
+        </label>
+        <label>
+          Password
+          <input name="password" type="password" autoComplete="current-password" required />
+        </label>
+        <button className="button primary" type="submit">
+          {submitting ? "Signing in..." : "Sign In"} <LockKeyhole size={18} />
+        </button>
+        <button className="button ghost" type="button" onClick={() => navigate("home")}>
+          Public Site
+        </button>
+        <p className="form-message" role="status">{message}</p>
+      </form>
+    </section>
+  );
+}
+
+function AdminPage({ clients, setClients, requests, setRequests, navigate, session, setSession }) {
   const [view, setView] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia("(min-width: 981px)").matches);
   const [clientSearch, setClientSearch] = useState("");
   const [requestSearch, setRequestSearch] = useState("");
   const [editing, setEditing] = useState(null);
   const [clientMessage, setClientMessage] = useState("");
+  const [adminMessage, setAdminMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (supabaseEnabled && !session) return;
+    let active = true;
+    setLoading(true);
+    fetchAdminData()
+      .then((data) => {
+        if (!active) return;
+        setClients(data.clients);
+        setRequests(data.requests);
+        setAdminMessage("");
+      })
+      .catch((error) => {
+        if (active) setAdminMessage(error.message || "Could not load admin data.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [session, setClients, setRequests]);
+
+  if (supabaseEnabled && !session) {
+    return <AdminLogin navigate={navigate} setSession={setSession} />;
+  }
 
   const stats = useMemo(() => {
     const ready = clients.filter((client) => client.status === "ready").length;
     const open = requests.filter((request) => request.status !== "Completed").length;
     const scheduled = requests.filter((request) => request.status === "Scheduled").length;
-    const pdf = clients.length ? Math.round((clients.filter((client) => client.pdfData).length / clients.length) * 100) : 0;
+    const pdf = clients.length ? Math.round((clients.filter((client) => client.reportPath || client.pdfData).length / clients.length) * 100) : 0;
     return { ready, open, scheduled, pdf };
   }, [clients, requests]);
 
@@ -629,25 +959,56 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate }) {
     const data = Object.fromEntries(new FormData(form).entries());
     const file = form.pdf.files[0];
     const existing = clients.find((client) => client.id === data.id);
-    const record = {
-      id: data.id || makeId("client"),
-      name: data.name.trim(),
-      email: data.email.trim(),
-      phone: data.phone.trim(),
-      password: data.password.trim(),
-      status: data.status,
-      pdfData: file ? await fileToDataUrl(file) : existing?.pdfData || "",
-      pdfName: file?.name || existing?.pdfName || "",
-      updatedAt: new Date().toISOString()
-    };
-    setClients((items) => (data.id ? items.map((item) => (item.id === data.id ? record : item)) : [record, ...items]));
-    setEditing(null);
-    setClientMessage("Client result record saved.");
-    form.reset();
+    setClientMessage("");
+    try {
+      const record = await saveClientRecord(data, file, existing);
+      setClients((items) => (data.id ? items.map((item) => (item.id === data.id ? record : item)) : [record, ...items]));
+      setEditing(null);
+      setClientMessage("Client result record saved.");
+      form.reset();
+    } catch (error) {
+      setClientMessage(error.message || "Could not save client record.");
+    }
   }
 
-  function updateRequest(id, status) {
+  async function updateRequest(id, status) {
+    const previous = requests;
     setRequests((items) => items.map((item) => (item.id === id ? { ...item, status } : item)));
+    try {
+      await updateRequestStatus(id, status);
+    } catch (error) {
+      setRequests(previous);
+      setAdminMessage(error.message || "Could not update request.");
+    }
+  }
+
+  async function deleteRequest(id) {
+    const previous = requests;
+    setRequests((items) => items.filter((item) => item.id !== id));
+    try {
+      await deleteRequestRecord(id);
+    } catch (error) {
+      setRequests(previous);
+      setAdminMessage(error.message || "Could not delete request.");
+    }
+  }
+
+  async function deleteClient(client) {
+    const previous = clients;
+    setClients((items) => items.filter((item) => item.id !== client.id));
+    try {
+      await deleteClientRecord(client);
+    } catch (error) {
+      setClients(previous);
+      setAdminMessage(error.message || "Could not delete client record.");
+    }
+  }
+
+  async function signOut() {
+    if (supabaseEnabled) {
+      await supabase.auth.signOut();
+    }
+    setSession(null);
   }
 
   function openAdminView(nextView) {
@@ -685,6 +1046,11 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate }) {
         <button className="button ghost" type="button" onClick={() => navigate("home")}>
           Public Site
         </button>
+        {supabaseEnabled && (
+          <button className="button ghost" type="button" onClick={signOut}>
+            Sign Out
+          </button>
+        )}
       </aside>
 
       <div className="ops-main">
@@ -704,6 +1070,11 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate }) {
             </div>
             <time>{new Date().toLocaleDateString("en-NG", { weekday: "short", month: "short", day: "numeric" })}</time>
           </div>
+          {(loading || adminMessage || !supabaseEnabled) && (
+            <p className="form-message" role="status">
+              {loading ? "Loading admin records..." : adminMessage || "Local development mode: add Supabase env vars to use the backend."}
+            </p>
+          )}
          
         </header>
 
@@ -731,7 +1102,7 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate }) {
                 </article>
                 <article>
                   <Upload size={22} />
-                  <strong>{clients.length - clients.filter((client) => client.pdfData).length} reports missing PDFs</strong>
+                  <strong>{clients.length - clients.filter((client) => client.reportPath || client.pdfData).length} reports missing PDFs</strong>
                   <span>Attach PDFs before marking reports ready.</span>
                 </article>
                 <article>
@@ -741,21 +1112,21 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate }) {
                 </article>
               </div>
             </section>
-            <RequestBoard requests={filteredRequests.slice(0, 6)} updateRequest={updateRequest} setRequests={setRequests} compact />
+            <RequestBoard requests={filteredRequests.slice(0, 6)} updateRequest={updateRequest} deleteRequest={deleteRequest} compact />
           </div>
         )}
 
         {view === "requests" && (
           <section className="surface board-panel">
             <BoardHeader title="Request queue" eyebrow="Requests" value={requestSearch} onChange={setRequestSearch} placeholder="Search requests" />
-            <RequestBoard requests={filteredRequests} updateRequest={updateRequest} setRequests={setRequests} />
+            <RequestBoard requests={filteredRequests} updateRequest={updateRequest} deleteRequest={deleteRequest} />
           </section>
         )}
 
         {view === "clients" && (
           <section className="surface table-panel">
             <BoardHeader title="Client records" eyebrow="Records" value={clientSearch} onChange={setClientSearch} placeholder="Search clients" />
-            <ClientTable clients={filteredClients} setClients={setClients} setEditing={(client) => {
+            <ClientTable clients={filteredClients} deleteClient={deleteClient} setEditing={(client) => {
               setEditing(client);
               setView("reports");
             }} />
@@ -767,7 +1138,7 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate }) {
             <RecordForm editing={editing} setEditing={setEditing} saveClient={saveClient} clientMessage={clientMessage} setClientMessage={setClientMessage} />
             <section className="surface table-panel">
               <BoardHeader title="Recent report records" eyebrow="Reports" value={clientSearch} onChange={setClientSearch} placeholder="Search records" />
-              <ClientTable clients={filteredClients} setClients={setClients} setEditing={setEditing} />
+              <ClientTable clients={filteredClients} deleteClient={deleteClient} setEditing={setEditing} />
             </section>
           </section>
         )}
@@ -791,7 +1162,7 @@ function BoardHeader({ title, eyebrow, value, onChange, placeholder }) {
   );
 }
 
-function RequestBoard({ requests, updateRequest, setRequests, compact = false }) {
+function RequestBoard({ requests, updateRequest, deleteRequest, compact = false }) {
   const columns = ["New", "Contacted", "Scheduled", "Completed"];
   return (
     <div className={`kanban ${compact ? "compact" : ""}`}>
@@ -818,7 +1189,7 @@ function RequestBoard({ requests, updateRequest, setRequests, compact = false })
                       <option key={status}>{status}</option>
                     ))}
                   </select>
-                  <button className="mini-button danger" type="button" onClick={() => setRequests((items) => items.filter((item) => item.id !== request.id))}>
+                  <button className="mini-button danger" type="button" onClick={() => deleteRequest(request.id)}>
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -867,6 +1238,7 @@ function RecordForm({ editing, setEditing, saveClient, clientMessage, setClientM
         <label>
           PDF result
           <input name="pdf" type="file" accept="application/pdf" />
+          {editing?.pdfName && <small>Current file reference: {editing.pdfName}</small>}
         </label>
       </div>
       <div className="form-footer">
@@ -889,7 +1261,25 @@ function RecordForm({ editing, setEditing, saveClient, clientMessage, setClientM
   );
 }
 
-function ClientTable({ clients, setClients, setEditing }) {
+function ClientTable({ clients, deleteClient, setEditing }) {
+  const [openingId, setOpeningId] = useState("");
+
+  async function openReport(client) {
+    if (!client.reportPath && !client.pdfData) return;
+    if (client.pdfData) {
+      window.open(client.pdfData, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    setOpeningId(client.id);
+    try {
+      const url = await getReportUrl(client);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } finally {
+      setOpeningId("");
+    }
+  }
+
   return (
     <div className="table-wrap">
       <table>
@@ -914,16 +1304,19 @@ function ClientTable({ clients, setClients, setEditing }) {
                   </span>
                 </td>
                 <td>
-                  {client.pdfData ? (
-                    <a href={client.pdfData} target="_blank" rel="noreferrer">{client.pdfName || "PDF"}</a>
+                  {client.reportPath || client.pdfData ? (
+                    <button className="link-button" type="button" onClick={() => openReport(client)}>
+                      {openingId === client.id ? "Opening..." : client.pdfName || "PDF"}
+                    </button>
                   ) : (
                     "No file"
                   )}
+                  {client.reportExpiresAt && <small className="table-note">Expires {formatDate(client.reportExpiresAt)}</small>}
                 </td>
                 <td>
                   <div className="row-actions">
                     <button className="mini-button" type="button" onClick={() => setEditing(client)}>Edit</button>
-                    <button className="mini-button danger" type="button" onClick={() => setClients((items) => items.filter((item) => item.id !== client.id))}>
+                    <button className="mini-button danger" type="button" onClick={() => deleteClient(client)}>
                       <Trash2 size={14} /> Delete
                     </button>
                   </div>

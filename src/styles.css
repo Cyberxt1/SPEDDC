@@ -1698,6 +1698,29 @@ td {
   overflow-wrap: anywhere;
 }
 
+.link-button {
+  display: inline;
+  padding: 0;
+  border: 0;
+  color: var(--brand-dark);
+  background: transparent;
+  font-weight: 800;
+  text-align: left;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+.table-note,
+.record-form small {
+  display: block;
+  margin-top: 5px;
+  color: var(--quiet);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
 td strong {
   color: var(--ink);
 }

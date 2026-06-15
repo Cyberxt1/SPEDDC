@@ -1,0 +1,5 @@
+[functions.cleanup-expired-report-files]
+verify_jwt = false
+
+[functions.verify-result-access]
+verify_jwt = false
