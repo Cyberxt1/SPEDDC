@@ -5645,6 +5645,512 @@ tr:hover td {
     align-items: center;
     justify-content: flex-start;
   }
+
+  .ops-main {
+    padding: calc(var(--ops-header-height) + 10px) 10px 16px;
+  }
+
+  .ops-strip {
+    min-height: 48px;
+  }
+
+  .metric-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .metric-card {
+    min-height: 76px;
+    padding: 10px;
+  }
+
+  .metric-card svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .metric-card span {
+    font-size: 0.68rem;
+  }
+
+  .metric-card strong {
+    font-size: 1.35rem;
+  }
+
+  .priority-panel,
+  .board-panel,
+  .table-panel {
+    padding: 14px;
+  }
+
+  .list-header {
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+  }
+
+  .list-header h2 {
+    font-size: 1.05rem;
+  }
+
+  .focus-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .focus-grid article {
+    min-height: 110px;
+    padding: 12px;
+  }
+
+  .focus-grid strong {
+    font-size: 0.82rem;
+  }
+
+  .focus-grid span {
+    font-size: 0.72rem;
+  }
+
+  .kanban.compact {
+    grid-auto-columns: minmax(160px, 190px);
+    gap: 8px;
+  }
+
+  .kanban.compact .kanban-column {
+    min-width: 160px;
+  }
+
+  .kanban-title {
+    padding: 10px;
+  }
+
+  .kanban-stack {
+    padding: 8px;
+  }
+
+  .overview-request-row {
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: 7px;
+  }
+
+  .overview-request-row > span {
+    width: 20px;
+    height: 20px;
+    font-size: 0.68rem;
+  }
+
+  .overview-request-row strong {
+    font-size: 0.78rem;
+  }
+}
+
+/* Brighter compact admin surfaces for small screens. */
+.ops-page {
+  background:
+    linear-gradient(180deg, #f6fbf7 0%, #eef7f1 100%);
+}
+
+.ops-strip,
+.metric-card,
+.priority-panel,
+.board-panel,
+.table-panel,
+.record-form,
+.recent-requests-panel,
+.request-history-panel,
+.request-expanded-panel,
+.client-list-row,
+.client-log-row {
+  border-color: #cfe7d7;
+  box-shadow: 0 8px 20px rgba(18, 130, 59, 0.06);
+}
+
+.metric-card svg,
+.focus-grid svg,
+.recent-request-card svg {
+  color: #0aa64b;
+}
+
+.metric-card strong,
+.list-header h2,
+.request-section-title strong {
+  color: #061b0e;
+}
+
+.status {
+  color: #8a5a00;
+  background: #fff1b8;
+}
+
+.status.ready {
+  color: #045a27;
+  background: #c9f7d8;
+}
+
+@media (max-width: 680px) {
+  .ops-page {
+    --ops-header-height: 66px;
+    background:
+      linear-gradient(180deg, #f8fff9 0%, #eef8f1 100%);
+  }
+
+  .ops-main {
+    padding: calc(var(--ops-header-height) + 8px) 8px 14px;
+  }
+
+  .ops-header-shell {
+    padding: 8px;
+  }
+
+  .ops-strip {
+    min-height: 48px;
+    padding: 6px 8px;
+    border-radius: 7px;
+  }
+
+  .ops-title-block strong {
+    font-size: 0.82rem;
+  }
+
+  .sidebar-toggle {
+    width: 34px;
+    height: 34px;
+  }
+
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .metric-card {
+    min-height: 78px;
+    padding: 10px;
+    border-radius: 7px;
+  }
+
+  .metric-card svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .metric-card span {
+    font-size: 0.68rem;
+  }
+
+  .metric-card strong {
+    font-size: 1.55rem;
+  }
+
+  .priority-panel,
+  .board-panel,
+  .table-panel,
+  .record-form {
+    padding: 12px;
+    border-radius: 8px;
+  }
+
+  .list-header {
+    margin-bottom: 10px;
+    padding-bottom: 9px;
+  }
+
+  .list-header .eyebrow,
+  .record-form .eyebrow {
+    margin-bottom: 6px;
+    font-size: 0.64rem;
+  }
+
+  .list-header h2,
+  .section-heading.tight h2,
+  .record-form .section-heading.tight h2 {
+    font-size: 1rem;
+  }
+
+  .focus-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .focus-grid article {
+    min-height: 92px;
+    padding: 11px;
+    border-radius: 8px;
+    background: #fbfffc;
+  }
+
+  .focus-grid svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .focus-grid strong {
+    font-size: 0.82rem;
+  }
+
+  .focus-grid span {
+    font-size: 0.72rem;
+    line-height: 1.45;
+  }
+
+  .kanban.compact {
+    grid-auto-columns: minmax(210px, 76vw);
+    gap: 10px;
+    padding-bottom: 8px;
+  }
+
+  .kanban.compact .kanban-column {
+    min-width: 210px;
+    border-radius: 8px;
+  }
+
+  .kanban-title {
+    padding: 9px 10px;
+  }
+
+  .kanban-title strong {
+    font-size: 0.82rem;
+  }
+
+  .kanban-stack {
+    padding: 8px;
+  }
+
+  .kanban.compact .request-card {
+    min-height: 44px;
+    padding: 9px;
+    border-radius: 7px;
+  }
+
+  .overview-request-row {
+    grid-template-columns: 22px minmax(0, 1fr);
+  }
+
+  .overview-request-row > span {
+    width: 20px;
+    height: 20px;
+    font-size: 0.66rem;
+    background: #d9fbe4;
+  }
+
+  .overview-request-row strong {
+    font-size: 0.78rem;
+  }
+
+  .recent-requests-panel,
+  .request-history-panel,
+  .request-expanded-panel {
+    padding: 10px;
+    border-radius: 8px;
+  }
+
+  .recent-request-scroll {
+    grid-auto-columns: minmax(210px, 76vw);
+    gap: 10px;
+  }
+
+  .recent-request-card {
+    min-height: 124px;
+    padding: 11px;
+    border-radius: 8px;
+  }
+
+  .request-history-row,
+  .client-list-row,
+  .client-log-row {
+    min-height: 42px;
+    padding: 8px;
+    border-radius: 7px;
+  }
+
+  .record-form .form-grid {
+    gap: 10px;
+  }
+
+  .form-grid label,
+  .stacked-form label {
+    gap: 5px;
+    font-size: 0.76rem;
+  }
+
+  input,
+  select,
+  textarea {
+    min-height: 38px;
+  }
+
+  .button,
+  .mini-button {
+    min-height: 38px;
+    border-radius: 7px;
+    font-size: 0.8rem;
+  }
+
+  .ops-sidebar {
+    background: #04160c;
+  }
+
+  .ops-sidebar nav button {
+    min-height: 40px;
+    border-radius: 7px;
+    font-size: 0.82rem;
+  }
+}
+
+/* Cleaner admin direction: compact, calm, high-contrast controls. */
+.ops-page {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(31, 185, 103, 0.1), transparent 34%),
+    linear-gradient(180deg, #f7faf8 0%, #eef5f1 100%);
+}
+
+.ops-sidebar {
+  background: #07110c;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ops-sidebar nav {
+  gap: 6px;
+}
+
+.ops-sidebar nav button {
+  min-height: 40px;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.ops-sidebar nav button.active,
+.ops-sidebar nav button:hover {
+  color: #ffffff;
+  background: #139447;
+}
+
+.ops-strip,
+.metric-card,
+.board-panel,
+.table-panel,
+.record-form,
+.kanban-column,
+.recent-requests-panel,
+.request-history-panel,
+.request-expanded-panel,
+.client-list-row {
+  border-color: #d7e7dd;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 22px rgba(8, 34, 17, 0.06);
+}
+
+.metric-grid {
+  gap: 10px;
+}
+
+.metric-card {
+  min-height: 92px;
+  padding: 13px;
+}
+
+.metric-card svg {
+  width: 18px;
+  height: 18px;
+  color: #129447;
+}
+
+.metric-card span {
+  color: #607268;
+  font-size: 0.72rem;
+}
+
+.metric-card strong {
+  margin-top: 4px;
+  font-size: 1.85rem;
+}
+
+.list-header .eyebrow,
+.record-form .eyebrow {
+  color: #139447;
+  font-size: 0.66rem;
+}
+
+.list-header h2 {
+  font-size: 1.12rem;
+}
+
+.ops-overview {
+  gap: 12px;
+}
+
+.kanban.compact {
+  padding: 0 2px 10px;
+}
+
+.kanban.compact .kanban-column {
+  background: #f9fcfa;
+}
+
+.kanban-title {
+  border-bottom: 1px solid #e6f0ea;
+}
+
+.kanban-title strong {
+  font-size: 0.84rem;
+}
+
+.kanban-title span {
+  color: #064d24;
+  background: #d9fbe4;
+}
+
+.kanban.compact .request-card {
+  border-color: #e2eee6;
+  box-shadow: none;
+}
+
+.overview-request-row > span,
+.client-list-main > span {
+  background: #d9fbe4;
+}
+
+.recent-request-card,
+.request-history-row {
+  background: #fbfdfb;
+}
+
+.status {
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.button.primary {
+  background: #139447;
+  box-shadow: 0 10px 24px rgba(19, 148, 71, 0.22);
+}
+
+.button.primary:hover {
+  box-shadow: 0 14px 30px rgba(19, 148, 71, 0.28);
+}
+
+@media (max-width: 680px) {
+  .metric-card {
+    min-height: 68px;
+    padding: 9px;
+  }
+
+  .metric-card strong {
+    font-size: 1.32rem;
+  }
+
+  .board-panel,
+  .table-panel,
+  .record-form {
+    padding: 10px;
+  }
+
+  .kanban.compact {
+    grid-auto-columns: minmax(190px, 72vw);
+  }
+
+  .kanban.compact .kanban-column {
+    min-width: 190px;
+  }
 }
 
 /* Admin overview compaction, quick actions, and sidebar rhythm. */
@@ -5704,8 +6210,8 @@ tr:hover td {
 }
 
 .kanban.compact .request-card {
-  min-height: 58px;
-  padding: 12px;
+  min-height: 46px;
+  padding: 10px;
   border: 1px solid #dce8df;
   background: #fff;
 }
@@ -5745,8 +6251,7 @@ tr:hover td {
 }
 
 .kanban.compact .request-actions {
-  gap: 7px;
-  margin-top: 9px;
+  display: none;
 }
 
 .kanban.compact .request-actions select {

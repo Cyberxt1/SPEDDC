@@ -417,25 +417,6 @@ async function downloadFile(url, fileName) {
   URL.revokeObjectURL(objectUrl);
 }
 
-async function sendRequestEmail({ to, subject, message }) {
-  if (!supabaseEnabled) {
-    openMailClient(to, subject, message);
-    return;
-  }
-
-  const { data, error } = await supabase.functions.invoke("send-request-email", {
-    body: { to, subject, message }
-  });
-
-  if (error) {
-    throw new Error(error.context?.error || error.context?.message || error.message || "Could not send email.");
-  }
-
-  if (data?.error) {
-    throw new Error(data.error);
-  }
-}
-
 function openMailClient(email, subject, body) {
   window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
@@ -1319,31 +1300,6 @@ function AdminPage({ clients, setClients, requests, setRequests, clientLogs, set
 
         {view === "overview" && (
           <div className="ops-overview">
-            <section className="surface priority-panel">
-              <div className="list-header">
-                <div>
-                  <p className="eyebrow">Priority</p>
-                  <h2>Today's operational focus</h2>
-                </div>
-              </div>
-              <div className="focus-grid">
-                <article>
-                  <Sparkles size={22} />
-                  <strong>{stats.open} requests need review</strong>
-                  <span>Move new requests to contacted or scheduled.</span>
-                </article>
-                <article>
-                  <Upload size={22} />
-                  <strong>{clients.length - clients.filter((client) => client.reportPath || client.pdfData).length} reports missing PDFs</strong>
-                  <span>Attach PDFs before marking reports ready.</span>
-                </article>
-                <article>
-                  <CalendarCheck size={22} />
-                  <strong>{stats.scheduled} sessions scheduled</strong>
-                  <span>Prepare client records after completed sessions.</span>
-                </article>
-              </div>
-            </section>
             <RequestBoard requests={filteredRequests.slice(0, 12)} updateRequest={updateRequest} deleteRequest={deleteRequest} compact onOpenRequest={setPreviewRequest} />
           </div>
         )}
@@ -1421,10 +1377,6 @@ function RequestWorkspace({ requests, updateRequest, deleteRequest, isPending })
     return [...requests].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }, [requests]);
   const [selectedId, setSelectedId] = useState(sortedRequests[0]?.id || "");
-  const [emailSubject, setEmailSubject] = useState("Service request follow-up");
-  const [emailBody, setEmailBody] = useState("");
-  const [sendingEmail, setSendingEmail] = useState(false);
-  const [emailMessage, setEmailMessage] = useState("");
   const selected = sortedRequests.find((request) => request.id === selectedId) || sortedRequests[0];
   const columns = ["New", "Contacted", "Scheduled", "Completed"];
 
@@ -1441,24 +1393,7 @@ function RequestWorkspace({ requests, updateRequest, deleteRequest, isPending })
 
   useEffect(() => {
     if (!selected) return;
-    setEmailSubject(`Service request follow-up - ${selected.service}`);
-    setEmailBody(`Hello ${selected.name},\n\nThank you for contacting the Special Needs Diagnosis and Therapy Center. We are following up on your request for ${selected.service}.\n\n`);
-    setEmailMessage("");
   }, [selected?.id]);
-
-  async function emailRequester() {
-    if (!selected || sendingEmail) return;
-    setSendingEmail(true);
-    setEmailMessage("");
-    try {
-      await sendRequestEmail({ to: selected.email, subject: emailSubject, message: emailBody });
-      setEmailMessage("Email sent.");
-    } catch (error) {
-      setEmailMessage(error.message || "Could not send email.");
-    } finally {
-      setSendingEmail(false);
-    }
-  }
 
   if (!sortedRequests.length) {
     return <p className="empty-note">No requests found.</p>;
@@ -1538,21 +1473,6 @@ function RequestWorkspace({ requests, updateRequest, deleteRequest, isPending })
               </div>
             </dl>
             {selected.note && <blockquote>{selected.note}</blockquote>}
-            <div className="request-email-panel">
-              <strong>Quick email</strong>
-              <label>
-                Subject
-                <input value={emailSubject} onChange={(event) => setEmailSubject(event.target.value)} />
-              </label>
-              <label>
-                Message
-                <textarea rows="5" value={emailBody} onChange={(event) => setEmailBody(event.target.value)} />
-              </label>
-              <button className="button primary" type="button" onClick={emailRequester} disabled={sendingEmail} aria-busy={sendingEmail}>
-                <Mail size={16} /> {sendingEmail ? "Sending..." : "Email Requester"}
-              </button>
-              <p className="form-message" role="status">{emailMessage}</p>
-            </div>
             <div className="request-expanded-actions">
               <select
                 value={selected.status}
@@ -1572,6 +1492,18 @@ function RequestWorkspace({ requests, updateRequest, deleteRequest, isPending })
               >
                 <Trash2 size={14} /> {isPending(`request-delete-${selected.id}`) ? "Deleting..." : "Delete"}
               </button>
+              <a
+                className="mini-button"
+                href={gmailComposeUrl(
+                  selected.email,
+                  `Request follow-up - ${selected.service}`,
+                  `Hello ${selected.name},\n\nThank you for contacting the Special Needs Diagnosis and Therapy Center. We are following up on your request for ${selected.service}.\n\n`
+                )}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Mail size={14} /> Gmail
+              </a>
             </div>
           </aside>
         )}
@@ -1822,6 +1754,8 @@ function ClientTable({ clients, deleteClient, isPending = () => false, onOpenCli
 function ClientModal({ client, close, setEditing }) {
   const subject = `Result record follow-up - ${client.name}`;
   const body = `Hello ${client.name},\n\nWe are contacting you from the Special Needs Diagnosis and Therapy Center regarding your result record.\n\n`;
+  const resultSubject = `Your result is ready - Special Needs Diagnosis and Therapy Center`;
+  const resultBody = `Hello ${client.name},\n\nYour result from the Special Needs Diagnosis and Therapy Center is ready.\n\nPlease find the PDF result attached to this email.\n\nIf you have any questions, kindly contact the center.\n\n`;
 
   return (
     <div className="modal-backdrop" role="presentation" onClick={close}>
@@ -1843,6 +1777,9 @@ function ClientModal({ client, close, setEditing }) {
           {client.reportExpiresAt && <div><dt>Expires</dt><dd>{formatDate(client.reportExpiresAt)}</dd></div>}
         </dl>
         <div className="modal-actions">
+          <a className="button primary" href={gmailComposeUrl(client.email, resultSubject, resultBody)} target="_blank" rel="noreferrer">
+            <FileText size={16} /> Send Result
+          </a>
           <a className="button primary" href={gmailComposeUrl(client.email, subject, body)} target="_blank" rel="noreferrer">
             <Mail size={16} /> Open Gmail
           </a>
