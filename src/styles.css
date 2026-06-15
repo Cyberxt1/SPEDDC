@@ -5632,3 +5632,152 @@ tr:hover td {
     display: grid;
   }
 }
+
+/* Admin overview compaction, quick actions, and sidebar rhythm. */
+.ops-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.ops-sidebar nav {
+  flex: 1 1 auto;
+}
+
+.ops-sidebar nav button,
+.ops-sidebar > .button {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.ops-sidebar > .button:first-of-type {
+  margin-top: auto;
+}
+
+.kanban.compact {
+  display: grid;
+  grid-auto-columns: minmax(250px, 290px);
+  grid-auto-flow: column;
+  grid-template-columns: none;
+  gap: 14px;
+  max-width: 100%;
+  padding: 2px 2px 12px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+}
+
+.kanban.compact .kanban-column {
+  min-width: 250px;
+  scroll-snap-align: start;
+}
+
+.kanban.compact .kanban-stack {
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.kanban.compact .request-card {
+  min-height: auto;
+  padding: 10px;
+  border: 1px solid #dce8df;
+  background: #fff;
+}
+
+.overview-request-row {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.overview-request-row strong {
+  overflow: hidden;
+  color: #050505;
+  font-size: 0.9rem;
+  line-height: 1.16;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview-request-row span {
+  overflow: hidden;
+  color: #5d685f;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kanban.compact .request-actions {
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.kanban.compact .request-actions select {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 34px;
+  font-size: 0.8rem;
+}
+
+.kanban.compact .mini-button {
+  flex: 0 0 34px;
+  width: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+}
+
+.request-email-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #dce8df;
+  border-radius: 10px;
+  background: #f8fbf8;
+}
+
+.request-email-panel strong {
+  color: #050505;
+}
+
+.request-email-panel label {
+  display: grid;
+  gap: 5px;
+  color: #5d685f;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.request-email-panel input,
+.request-email-panel textarea {
+  width: 100%;
+  border-color: #dce8df;
+  border-radius: 8px;
+  background: #fff;
+  color: #101828;
+}
+
+.request-email-panel .button {
+  width: fit-content;
+  min-height: 40px;
+}
+
+.row-actions .mini-button {
+  text-decoration: none;
+}
+
+@media (max-width: 680px) {
+  .request-email-panel .button {
+    width: 100%;
+  }
+
+  .row-actions {
+    align-items: stretch;
+  }
+
+  .row-actions .mini-button {
+    flex: 1 1 auto;
+  }
+}

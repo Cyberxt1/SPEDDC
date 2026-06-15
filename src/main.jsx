@@ -417,6 +417,11 @@ async function downloadFile(url, fileName) {
   URL.revokeObjectURL(objectUrl);
 }
 
+function openMailClient(email, subject, body) {
+  const mailto = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = mailto;
+}
+
 function routeFromLocation() {
   if (location.hash) {
     const hashRoute = location.hash.replace("#", "") || "home";
@@ -1382,6 +1387,8 @@ function RequestWorkspace({ requests, updateRequest, deleteRequest, isPending })
     return [...requests].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }, [requests]);
   const [selectedId, setSelectedId] = useState(sortedRequests[0]?.id || "");
+  const [emailSubject, setEmailSubject] = useState("Service request follow-up");
+  const [emailBody, setEmailBody] = useState("");
   const selected = sortedRequests.find((request) => request.id === selectedId) || sortedRequests[0];
   const columns = ["New", "Contacted", "Scheduled", "Completed"];
 
@@ -1395,6 +1402,12 @@ function RequestWorkspace({ requests, updateRequest, deleteRequest, isPending })
       setSelectedId(sortedRequests[0].id);
     }
   }, [sortedRequests, selectedId]);
+
+  useEffect(() => {
+    if (!selected) return;
+    setEmailSubject(`Service request follow-up - ${selected.service}`);
+    setEmailBody(`Hello ${selected.name},\n\nThank you for contacting the Special Needs Diagnosis and Therapy Center. We are following up on your request for ${selected.service}.\n\n`);
+  }, [selected?.id]);
 
   if (!sortedRequests.length) {
     return <p className="empty-note">No requests found.</p>;
@@ -1474,6 +1487,20 @@ function RequestWorkspace({ requests, updateRequest, deleteRequest, isPending })
               </div>
             </dl>
             {selected.note && <blockquote>{selected.note}</blockquote>}
+            <div className="request-email-panel">
+              <strong>Quick email</strong>
+              <label>
+                Subject
+                <input value={emailSubject} onChange={(event) => setEmailSubject(event.target.value)} />
+              </label>
+              <label>
+                Message
+                <textarea rows="5" value={emailBody} onChange={(event) => setEmailBody(event.target.value)} />
+              </label>
+              <button className="button primary" type="button" onClick={() => openMailClient(selected.email, emailSubject, emailBody)}>
+                <Mail size={16} /> Email Requester
+              </button>
+            </div>
             <div className="request-expanded-actions">
               <select
                 value={selected.status}
@@ -1514,14 +1541,23 @@ function RequestBoard({ requests, updateRequest, deleteRequest, isPending = () =
           <div className="kanban-stack">
             {requests.filter((request) => request.status === column).map((request) => (
               <article className="request-card" key={request.id}>
-                <div className="request-card-top">
-                  <span className="status">{request.urgency || "Routine"}</span>
-                  <span>{formatDate(request.createdAt)}</span>
-                </div>
-                <h3>{request.name}</h3>
-                <p>{request.service}</p>
-                <p>{request.email} / {request.phone}</p>
-                {request.note && <blockquote>{request.note}</blockquote>}
+                {compact ? (
+                  <div className="overview-request-row">
+                    <strong>{request.name}</strong>
+                    <span>{request.phone}</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="request-card-top">
+                      <span className="status">{request.urgency || "Routine"}</span>
+                      <span>{formatDate(request.createdAt)}</span>
+                    </div>
+                    <h3>{request.name}</h3>
+                    <p>{request.service}</p>
+                    <p>{request.email} / {request.phone}</p>
+                    {request.note && <blockquote>{request.note}</blockquote>}
+                  </>
+                )}
                 <div className="request-actions">
                   <select
                     value={request.status}
@@ -1685,6 +1721,12 @@ function ClientTable({ clients, deleteClient, isPending = () => false, setEditin
                 <td>
                   <div className="row-actions">
                     <button className="mini-button" type="button" onClick={() => setEditing(client)} disabled={isPending(`client-delete-${client.id}`)}>Edit</button>
+                    <a className="mini-button" href={`mailto:${client.email}`}>
+                      <Mail size={14} /> Email
+                    </a>
+                    <a className="mini-button" href={`tel:${client.phone}`}>
+                      <Phone size={14} /> Call
+                    </a>
                     <button
                       className="mini-button danger"
                       type="button"
