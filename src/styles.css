@@ -4344,6 +4344,8 @@ tr:hover td {
 }
 
 .site-footer {
+  position: relative;
+  z-index: 8;
   display: block;
   width: 100%;
   margin: 0;
@@ -4570,5 +4572,372 @@ tr:hover td {
 
   .hero-trust-strip {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Anchored homepage background and livelier cards. */
+.redesigned-home {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  background: transparent;
+}
+
+.redesigned-home::before {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  content: "";
+  background-image: var(--hero-bg);
+  background-position: center;
+  background-size: cover;
+  transform: translateZ(0);
+  pointer-events: none;
+}
+
+.redesigned-home::after {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  content: "";
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.48) 42%, rgba(255, 255, 255, 0.08) 100%),
+    radial-gradient(circle at 16% 18%, rgba(18, 130, 59, 0.28), transparent 34%);
+  pointer-events: none;
+}
+
+.hero-redesign {
+  z-index: 2;
+  background-image: none;
+  background-color: transparent;
+}
+
+.hero-redesign::before {
+  display: none;
+}
+
+.hero-redesign::after {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.08));
+}
+
+.hero-redesign-copy,
+.hero-quick-panel,
+.hero-trust-strip {
+  position: relative;
+  z-index: 1;
+}
+
+.language-card,
+.hero-quick-panel article,
+.hero-trust-strip article {
+  backdrop-filter: blur(16px);
+}
+
+.hero-quick-panel article,
+.hero-trust-strip article,
+.services-redesign-grid article,
+.audience-list span,
+.report-band {
+  transition:
+    transform 190ms ease,
+    box-shadow 190ms ease,
+    border-color 190ms ease,
+    background 190ms ease;
+}
+
+.hero-quick-panel article:hover,
+.hero-trust-strip article:hover {
+  transform: translateY(-5px);
+  border-color: rgba(255, 255, 255, 0.54);
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.22);
+}
+
+.design-section,
+.report-band {
+  position: relative;
+  z-index: 3;
+}
+
+.services-redesign {
+  margin-top: -18px;
+  padding-top: clamp(72px, 9vw, 112px);
+  padding-bottom: clamp(74px, 8vw, 108px);
+  border-radius: 28px 28px 0 0;
+  background: #f7faf8;
+  box-shadow:
+    0 -28px 70px rgba(0, 0, 0, 0.18),
+    0 0 0 100vmax #f7faf8;
+}
+
+.services-redesign-grid {
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+}
+
+.services-redesign-grid article {
+  position: relative;
+  overflow: hidden;
+  grid-column: span 2;
+  min-height: 228px;
+  padding: 26px;
+  border-color: #d7e8dd;
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #fbfdfb 100%);
+  box-shadow: 0 14px 32px rgba(5, 45, 21, 0.08);
+  animation: softRise both;
+  animation-timeline: view();
+  animation-range: entry 8% cover 32%;
+}
+
+.services-redesign-grid article::before {
+  display: none;
+}
+
+.services-redesign-grid article::after {
+  position: absolute;
+  inset: -40% auto auto -28%;
+  width: 34%;
+  height: 180%;
+  content: "";
+  background: linear-gradient(90deg, transparent, rgba(18, 130, 59, 0.12), transparent);
+  transform: rotate(18deg) translateX(-140%);
+  transition: transform 560ms ease;
+  pointer-events: none;
+}
+
+.services-redesign-grid article:nth-child(1),
+.services-redesign-grid article:nth-child(2) {
+  grid-column: span 3;
+  min-height: 252px;
+}
+
+.services-redesign-grid article svg {
+  width: 42px;
+  height: 42px;
+  padding: 9px;
+  border-radius: 12px;
+  color: #fff;
+  background: #12823b;
+  box-shadow: 0 12px 26px rgba(18, 130, 59, 0.22);
+  transition: transform 220ms ease, background 220ms ease;
+}
+
+.services-redesign-grid article:hover {
+  transform: translateY(-10px) scale(1.01);
+  border-color: rgba(18, 130, 59, 0.28);
+  box-shadow: 0 26px 58px rgba(5, 45, 21, 0.14);
+}
+
+.services-redesign-grid article:hover::after {
+  transform: rotate(18deg) translateX(360%);
+}
+
+.services-redesign-grid article:hover svg {
+  transform: rotate(-5deg) scale(1.08) translateY(-2px);
+  background: #0f6f32;
+}
+
+.split-redesign {
+  position: relative;
+  margin-top: 0;
+  padding-top: clamp(76px, 9vw, 116px);
+  padding-bottom: clamp(76px, 9vw, 116px);
+  background: #ffffff;
+  box-shadow: 0 0 0 100vmax #ffffff;
+  clip-path: inset(0 -100vmax);
+}
+
+.split-redesign::before {
+  position: absolute;
+  top: 0;
+  left: max(18px, calc((100vw - 1180px) / 2));
+  right: max(18px, calc((100vw - 1180px) / 2));
+  height: 1px;
+  content: "";
+  background: #dfeae3;
+}
+
+.split-redesign > div:first-child {
+  position: sticky;
+  top: 110px;
+}
+
+.audience-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.audience-list span {
+  position: relative;
+  min-height: 76px;
+  padding: 18px 18px 18px 52px;
+  border-color: #d9e9de;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #ffffff, #f8fbf8);
+  box-shadow: 0 10px 24px rgba(5, 45, 21, 0.06);
+  animation: softRise both;
+  animation-timeline: view();
+  animation-range: entry 8% cover 30%;
+}
+
+.audience-list span::before {
+  position: absolute;
+  left: 18px;
+  width: 18px;
+  height: 18px;
+  content: "";
+  border: 5px solid #dff4e6;
+  border-radius: 999px;
+  background: #12823b;
+}
+
+.audience-list span:hover {
+  transform: translateX(8px) scale(1.018);
+  border-color: rgba(230, 107, 80, 0.34);
+  background: #fff;
+  box-shadow: 0 18px 36px rgba(5, 45, 21, 0.11);
+}
+
+.design-heading p,
+.split-redesign .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  width: fit-content;
+  padding: 0 12px;
+  border: 1px solid #cfe4d5;
+  border-radius: 999px;
+  background: #eef8f1;
+  color: #064d24;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+@keyframes softRise {
+  from {
+    opacity: 0.62;
+    transform: translateY(28px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.report-band {
+  overflow: hidden;
+  min-height: clamp(320px, 48vh, 520px);
+  margin-top: clamp(42px, 8vw, 96px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background:
+    linear-gradient(135deg, rgba(6, 77, 36, 0.96), rgba(18, 130, 59, 0.92)),
+    var(--hero-bg);
+  background-position: center;
+  background-size: cover;
+  box-shadow: 0 28px 68px rgba(6, 77, 36, 0.22);
+  animation: reportFloatIn both;
+  animation-timeline: view();
+  animation-range: entry 8% cover 38%;
+}
+
+.report-band::before {
+  display: none;
+}
+
+.report-band::after {
+  position: absolute;
+  inset: -45% auto auto -20%;
+  width: 42%;
+  height: 190%;
+  content: "";
+  background: rgba(255, 255, 255, 0.11);
+  transform: rotate(18deg) translateX(-120%);
+  transition: transform 620ms ease;
+  pointer-events: none;
+}
+
+.report-band:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 36px 86px rgba(6, 77, 36, 0.3);
+}
+
+.report-band:hover::after {
+  transform: rotate(18deg) translateX(330%);
+}
+
+.report-band .button {
+  position: relative;
+  z-index: 1;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.report-band .button:hover {
+  transform: translateY(-2px) scale(1.02);
+}
+
+@keyframes reportFloatIn {
+  from {
+    opacity: 0.74;
+    transform: translateY(42px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 980px) {
+  .services-redesign {
+    margin-top: 0;
+    border-radius: 22px 22px 0 0;
+  }
+
+  .services-redesign-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .services-redesign-grid article,
+  .services-redesign-grid article:nth-child(1),
+  .services-redesign-grid article:nth-child(2) {
+    grid-column: auto;
+    min-height: 224px;
+  }
+
+  .split-redesign > div:first-child {
+    position: static;
+  }
+}
+
+@media (max-width: 680px) {
+  .redesigned-home::before,
+  .redesigned-home::after {
+    position: absolute;
+    min-height: 720px;
+  }
+
+  .services-redesign-grid article {
+    min-height: 204px;
+  }
+
+  .services-redesign-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .audience-list span:hover {
+    transform: translateY(-3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-quick-panel article,
+  .hero-trust-strip article,
+  .services-redesign-grid article,
+  .audience-list span,
+  .services-redesign-grid article svg,
+  .services-redesign-grid article::before {
+    transition: none;
   }
 }

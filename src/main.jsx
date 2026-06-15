@@ -498,8 +498,8 @@ function Home({ navigate }) {
   const activeMessage = languageMessages[messageIndex];
 
   return (
-    <div className="home-page redesigned-home">
-      <section className="hero-redesign" style={{ "--hero-bg": `url(${heroBackground})` }}>
+    <div className="home-page redesigned-home" style={{ "--hero-bg": `url(${heroBackground})` }}>
+      <section className="hero-redesign">
         <div className="hero-redesign-copy" key={activeMessage.language}>
           <h1>Special Needs Diagnosis and Therapy Center</h1>
           <p className="hero-lede">
@@ -568,8 +568,8 @@ function Home({ navigate }) {
 
       <section className="design-section services-redesign">
         <div className="design-heading">
-          <p>What we do</p>
-          <h2>Services built around clarity, care, and practical decisions.</h2>
+          <p>We Offer</p>
+          <h2>Assessment, therapy, consultation, and documentation support.</h2>
         </div>
         <div className="services-redesign-grid">
           {serviceAreas.map(({ title, description, icon: Icon }) => (
@@ -584,8 +584,8 @@ function Home({ navigate }) {
 
       <section className="design-section split-redesign">
         <div>
-          <p className="eyebrow">Who we support</p>
-          <h2>For individuals, families, schools, and professional bodies.</h2>
+          <p className="eyebrow">To</p>
+          <h2>Individuals, families, schools, and professional bodies.</h2>
           <p>
             The center helps people understand needs, document findings, and determine appropriate support pathways.
           </p>
