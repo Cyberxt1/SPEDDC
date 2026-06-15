@@ -10,6 +10,7 @@ This app uses Supabase Auth, Postgres, and private Storage for report PDFs.
 
 ```bash
 supabase functions deploy verify-result-access
+supabase functions deploy send-request-email
 supabase functions deploy cleanup-expired-report-files
 ```
 
@@ -31,6 +32,8 @@ RESULTS_FROM_EMAIL="Results Desk <results@your-domain.com>"
 ```
 
 If `RESEND_API_KEY` is missing, the app still blocks access after 5 attempts, but it cannot send the email link automatically.
+
+The admin request email button uses `send-request-email`, which needs the same `SERVICE_ROLE_KEY`, `RESEND_API_KEY`, and `RESULTS_FROM_EMAIL` secrets.
 
 ## First admin
 

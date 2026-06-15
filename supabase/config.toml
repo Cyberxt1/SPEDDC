@@ -3,3 +3,6 @@ verify_jwt = false
 
 [functions.verify-result-access]
 verify_jwt = false
+
+[functions.send-request-email]
+verify_jwt = true

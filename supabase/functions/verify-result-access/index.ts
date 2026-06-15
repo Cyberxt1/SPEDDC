@@ -134,28 +134,32 @@ async function handleTokenDownload(request: Request) {
   const tokenHash = await sha256(token);
   const { data, error } = await supabase
     .from("result_download_tokens")
-    .select("id, expires_at, used_at, clients(report_path)")
+    .select("id, expires_at, clients(report_path, report_name)")
     .eq("token_hash", tokenHash)
     .single();
 
-  if (error || !data || data.used_at || new Date(data.expires_at) < new Date()) {
+  if (error || !data || new Date(data.expires_at) < new Date()) {
+    console.error("verify-result-access token download failed", { error, hasData: Boolean(data) });
     return new Response("This download link is invalid or expired.", { status: 410, headers: corsHeaders });
   }
 
-  const reportPath = data.clients?.report_path;
+  const clientRecord = Array.isArray(data.clients) ? data.clients[0] : data.clients;
+  const reportPath = clientRecord?.report_path;
   if (!reportPath) {
+    console.error("verify-result-access token missing report path", { tokenId: data.id });
     return new Response("Report file is not available.", { status: 404, headers: corsHeaders });
   }
 
   const { data: signed, error: signedError } = await supabase.storage
     .from("reports")
-    .createSignedUrl(reportPath, 60 * 10);
+    .createSignedUrl(reportPath, 60 * 10, {
+      download: clientRecord?.report_name || "result.pdf"
+    });
 
   if (signedError) {
     return new Response(signedError.message, { status: 500, headers: corsHeaders });
   }
 
-  await supabase.from("result_download_tokens").update({ used_at: new Date().toISOString() }).eq("id", data.id);
   return Response.redirect(signed.signedUrl, 302);
 }
 

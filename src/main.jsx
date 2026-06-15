@@ -417,9 +417,31 @@ async function downloadFile(url, fileName) {
   URL.revokeObjectURL(objectUrl);
 }
 
+async function sendRequestEmail({ to, subject, message }) {
+  if (!supabaseEnabled) {
+    openMailClient(to, subject, message);
+    return;
+  }
+
+  const { data, error } = await supabase.functions.invoke("send-request-email", {
+    body: { to, subject, message }
+  });
+
+  if (error) {
+    throw new Error(error.context?.error || error.context?.message || error.message || "Could not send email.");
+  }
+
+  if (data?.error) {
+    throw new Error(data.error);
+  }
+}
+
 function openMailClient(email, subject, body) {
-  const mailto = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  window.location.href = mailto;
+  window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function gmailComposeUrl(email, subject, body) {
+  return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 function routeFromLocation() {
@@ -884,7 +906,7 @@ function ResultCard({ result, navigate }) {
         <Mail size={30} />
         <h2>Result access limit reached</h2>
         <p>
-          Result access has exceeded the limit. Check your email address for a secure download link to continue or contact the system administrator.
+          Result access has exceeded the limit. Please contact the center administrator to continue.
         </p>
         {result.emailSent === false && (
           <p>The email could not be sent automatically. Please contact the center for support.</p>
@@ -1048,6 +1070,8 @@ function AdminPage({ clients, setClients, requests, setRequests, clientLogs, set
   const [loading, setLoading] = useState(false);
   const [savingClient, setSavingClient] = useState(false);
   const [pendingActions, setPendingActions] = useState({});
+  const [previewRequest, setPreviewRequest] = useState(null);
+  const [previewClient, setPreviewClient] = useState(null);
 
   function isPending(key) {
     return Boolean(pendingActions[key]);
@@ -1320,7 +1344,7 @@ function AdminPage({ clients, setClients, requests, setRequests, clientLogs, set
                 </article>
               </div>
             </section>
-            <RequestBoard requests={filteredRequests.slice(0, 6)} updateRequest={updateRequest} deleteRequest={deleteRequest} compact />
+            <RequestBoard requests={filteredRequests.slice(0, 12)} updateRequest={updateRequest} deleteRequest={deleteRequest} compact onOpenRequest={setPreviewRequest} />
           </div>
         )}
 
@@ -1334,7 +1358,7 @@ function AdminPage({ clients, setClients, requests, setRequests, clientLogs, set
         {view === "clients" && (
           <section className="surface table-panel">
             <BoardHeader title="Client records" eyebrow="Records" value={clientSearch} onChange={setClientSearch} placeholder="Search clients" />
-            <ClientTable clients={filteredClients} deleteClient={deleteClient} isPending={isPending} setEditing={(client) => {
+            <ClientTable clients={filteredClients} deleteClient={deleteClient} isPending={isPending} onOpenClient={setPreviewClient} setEditing={(client) => {
               setEditing(client);
               setView("reports");
             }} />
@@ -1346,7 +1370,7 @@ function AdminPage({ clients, setClients, requests, setRequests, clientLogs, set
             <RecordForm editing={editing} setEditing={setEditing} saveClient={saveClient} savingClient={savingClient} clientMessage={clientMessage} setClientMessage={setClientMessage} />
             <section className="surface table-panel">
               <BoardHeader title="Recent report records" eyebrow="Reports" value={clientSearch} onChange={setClientSearch} placeholder="Search records" />
-              <ClientTable clients={filteredClients} deleteClient={deleteClient} isPending={isPending} setEditing={setEditing} />
+              <ClientTable clients={filteredClients} deleteClient={deleteClient} isPending={isPending} onOpenClient={setPreviewClient} setEditing={setEditing} />
             </section>
           </section>
         )}
@@ -1363,6 +1387,16 @@ function AdminPage({ clients, setClients, requests, setRequests, clientLogs, set
           </section>
         )}
       </div>
+      {previewRequest && (
+        <RequestModal request={previewRequest} updateRequest={updateRequest} deleteRequest={deleteRequest} close={() => setPreviewRequest(null)} />
+      )}
+      {previewClient && (
+        <ClientModal client={previewClient} close={() => setPreviewClient(null)} setEditing={(client) => {
+          setPreviewClient(null);
+          setEditing(client);
+          setView("reports");
+        }} />
+      )}
     </section>
   );
 }
@@ -1389,6 +1423,8 @@ function RequestWorkspace({ requests, updateRequest, deleteRequest, isPending })
   const [selectedId, setSelectedId] = useState(sortedRequests[0]?.id || "");
   const [emailSubject, setEmailSubject] = useState("Service request follow-up");
   const [emailBody, setEmailBody] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailMessage, setEmailMessage] = useState("");
   const selected = sortedRequests.find((request) => request.id === selectedId) || sortedRequests[0];
   const columns = ["New", "Contacted", "Scheduled", "Completed"];
 
@@ -1407,7 +1443,22 @@ function RequestWorkspace({ requests, updateRequest, deleteRequest, isPending })
     if (!selected) return;
     setEmailSubject(`Service request follow-up - ${selected.service}`);
     setEmailBody(`Hello ${selected.name},\n\nThank you for contacting the Special Needs Diagnosis and Therapy Center. We are following up on your request for ${selected.service}.\n\n`);
+    setEmailMessage("");
   }, [selected?.id]);
+
+  async function emailRequester() {
+    if (!selected || sendingEmail) return;
+    setSendingEmail(true);
+    setEmailMessage("");
+    try {
+      await sendRequestEmail({ to: selected.email, subject: emailSubject, message: emailBody });
+      setEmailMessage("Email sent.");
+    } catch (error) {
+      setEmailMessage(error.message || "Could not send email.");
+    } finally {
+      setSendingEmail(false);
+    }
+  }
 
   if (!sortedRequests.length) {
     return <p className="empty-note">No requests found.</p>;
@@ -1497,9 +1548,10 @@ function RequestWorkspace({ requests, updateRequest, deleteRequest, isPending })
                 Message
                 <textarea rows="5" value={emailBody} onChange={(event) => setEmailBody(event.target.value)} />
               </label>
-              <button className="button primary" type="button" onClick={() => openMailClient(selected.email, emailSubject, emailBody)}>
-                <Mail size={16} /> Email Requester
+              <button className="button primary" type="button" onClick={emailRequester} disabled={sendingEmail} aria-busy={sendingEmail}>
+                <Mail size={16} /> {sendingEmail ? "Sending..." : "Email Requester"}
               </button>
+              <p className="form-message" role="status">{emailMessage}</p>
             </div>
             <div className="request-expanded-actions">
               <select
@@ -1528,7 +1580,7 @@ function RequestWorkspace({ requests, updateRequest, deleteRequest, isPending })
   );
 }
 
-function RequestBoard({ requests, updateRequest, deleteRequest, isPending = () => false, compact = false }) {
+function RequestBoard({ requests, updateRequest, deleteRequest, isPending = () => false, compact = false, onOpenRequest = null }) {
   const columns = ["New", "Contacted", "Scheduled", "Completed"];
   return (
     <div className={`kanban ${compact ? "compact" : ""}`}>
@@ -1542,10 +1594,10 @@ function RequestBoard({ requests, updateRequest, deleteRequest, isPending = () =
             {requests.filter((request) => request.status === column).map((request) => (
               <article className="request-card" key={request.id}>
                 {compact ? (
-                  <div className="overview-request-row">
+                  <button className="overview-request-row" type="button" onClick={() => onOpenRequest?.(request)}>
                     <strong>{request.name}</strong>
                     <span>{request.phone}</span>
-                  </div>
+                  </button>
                 ) : (
                   <>
                     <div className="request-card-top">
@@ -1584,6 +1636,54 @@ function RequestBoard({ requests, updateRequest, deleteRequest, isPending = () =
           </div>
         </section>
       ))}
+    </div>
+  );
+}
+
+function RequestModal({ request, updateRequest, deleteRequest, close }) {
+  const columns = ["New", "Contacted", "Scheduled", "Completed"];
+  const subject = `Service request follow-up - ${request.service}`;
+  const body = `Hello ${request.name},\n\nThank you for contacting the Special Needs Diagnosis and Therapy Center. We are following up on your request for ${request.service}.\n\n`;
+
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={close}>
+      <aside className="detail-modal" role="dialog" aria-modal="true" aria-label="Request details" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-head">
+          <div>
+            <span className="status">{request.status}</span>
+            <h2>{request.name}</h2>
+          </div>
+          <button className="mini-button" type="button" onClick={close}>
+            <X size={14} /> Close
+          </button>
+        </div>
+        <dl className="detail-list">
+          <div><dt>Service</dt><dd>{request.service}</dd></div>
+          <div><dt>Client type</dt><dd>{request.clientType}</dd></div>
+          <div><dt>Priority</dt><dd>{request.urgency || "Routine"}</dd></div>
+          <div><dt>Email</dt><dd>{request.email}</dd></div>
+          <div><dt>Phone</dt><dd>{request.phone}</dd></div>
+          <div><dt>Created</dt><dd>{formatDate(request.createdAt)}</dd></div>
+        </dl>
+        {request.note && <blockquote>{request.note}</blockquote>}
+        <div className="modal-actions">
+          <select value={request.status} onChange={(event) => updateRequest(request.id, event.target.value)}>
+            {columns.map((status) => <option key={status}>{status}</option>)}
+          </select>
+          <a className="button primary" href={gmailComposeUrl(request.email, subject, body)} target="_blank" rel="noreferrer">
+            <Mail size={16} /> Open Gmail
+          </a>
+          <a className="button ghost" href={`tel:${request.phone}`}>
+            <Phone size={16} /> Call
+          </a>
+          <button className="button ghost danger-text" type="button" onClick={() => {
+            deleteRequest(request.id);
+            close();
+          }}>
+            <Trash2 size={16} /> Delete
+          </button>
+        </div>
+      </aside>
     </div>
   );
 }
@@ -1666,7 +1766,7 @@ function ClientLogList({ logs }) {
   );
 }
 
-function ClientTable({ clients, deleteClient, isPending = () => false, setEditing }) {
+function ClientTable({ clients, deleteClient, isPending = () => false, onOpenClient = null, setEditing }) {
   const [openingId, setOpeningId] = useState("");
 
   async function openReport(client) {
@@ -1686,67 +1786,70 @@ function ClientTable({ clients, deleteClient, isPending = () => false, setEditin
   }
 
   return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Client</th>
-            <th>Contact</th>
-            <th>Status</th>
-            <th>PDF</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {clients.length ? (
-            clients.map((client) => (
-              <tr key={client.id}>
-                <td><strong>{client.name}</strong></td>
-                <td>{client.email}<br />{client.phone}</td>
-                <td>
-                  <span className={`status ${client.status === "ready" ? "ready" : ""}`}>
-                    {client.status === "ready" ? "Ready" : "Not ready"}
-                  </span>
-                </td>
-                <td>
-                  {client.reportPath || client.pdfData ? (
-                    <button className="link-button" type="button" onClick={() => openReport(client)}>
-                      {openingId === client.id ? "Opening..." : client.pdfName || "PDF"}
-                    </button>
-                  ) : (
-                    "No file"
-                  )}
-                  {client.reportExpiresAt && <small className="table-note">Expires {formatDate(client.reportExpiresAt)}</small>}
-                </td>
-                <td>
-                  <div className="row-actions">
-                    <button className="mini-button" type="button" onClick={() => setEditing(client)} disabled={isPending(`client-delete-${client.id}`)}>Edit</button>
-                    <a className="mini-button" href={`mailto:${client.email}`}>
-                      <Mail size={14} /> Email
-                    </a>
-                    <a className="mini-button" href={`tel:${client.phone}`}>
-                      <Phone size={14} /> Call
-                    </a>
-                    <button
-                      className="mini-button danger"
-                      type="button"
-                      onClick={() => deleteClient(client)}
-                      disabled={isPending(`client-delete-${client.id}`)}
-                      aria-busy={isPending(`client-delete-${client.id}`)}
-                    >
-                      <Trash2 size={14} /> {isPending(`client-delete-${client.id}`) ? "Deleting..." : "Delete"}
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan="5">No client records found.</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+    <div className="client-list">
+      {clients.length ? (
+        clients.map((client, index) => (
+          <article className="client-list-row" key={client.id}>
+            <button className="client-list-main" type="button" onClick={() => onOpenClient?.(client)}>
+              <span>{index + 1}</span>
+              <strong>{client.name}</strong>
+              <small>{client.phone}</small>
+              <i className={`status ${client.status === "ready" ? "ready" : ""}`}>
+                {client.status === "ready" ? "Ready" : "Not ready"}
+              </i>
+            </button>
+            <div className="row-actions">
+              {client.reportPath || client.pdfData ? (
+                <button className="mini-button" type="button" onClick={() => openReport(client)}>
+                  {openingId === client.id ? "Opening..." : "PDF"}
+                </button>
+              ) : (
+                <span className="mini-muted">No PDF</span>
+              )}
+              <button className="mini-button" type="button" onClick={() => setEditing(client)} disabled={isPending(`client-delete-${client.id}`)}>Edit</button>
+            </div>
+          </article>
+        ))
+      ) : (
+        <p className="empty-note">No client records found.</p>
+      )}
+    </div>
+  );
+}
+
+function ClientModal({ client, close, setEditing }) {
+  const subject = `Result record follow-up - ${client.name}`;
+  const body = `Hello ${client.name},\n\nWe are contacting you from the Special Needs Diagnosis and Therapy Center regarding your result record.\n\n`;
+
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={close}>
+      <aside className="detail-modal" role="dialog" aria-modal="true" aria-label="Client details" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-head">
+          <div>
+            <span className={`status ${client.status === "ready" ? "ready" : ""}`}>{client.status === "ready" ? "Ready" : "Not ready"}</span>
+            <h2>{client.name}</h2>
+          </div>
+          <button className="mini-button" type="button" onClick={close}>
+            <X size={14} /> Close
+          </button>
+        </div>
+        <dl className="detail-list">
+          <div><dt>Email</dt><dd>{client.email}</dd></div>
+          <div><dt>Phone</dt><dd>{client.phone}</dd></div>
+          <div><dt>Password</dt><dd>{client.password}</dd></div>
+          <div><dt>PDF</dt><dd>{client.pdfName || "No file"}</dd></div>
+          {client.reportExpiresAt && <div><dt>Expires</dt><dd>{formatDate(client.reportExpiresAt)}</dd></div>}
+        </dl>
+        <div className="modal-actions">
+          <a className="button primary" href={gmailComposeUrl(client.email, subject, body)} target="_blank" rel="noreferrer">
+            <Mail size={16} /> Open Gmail
+          </a>
+          <a className="button ghost" href={`tel:${client.phone}`}>
+            <Phone size={16} /> Call
+          </a>
+          <button className="button ghost" type="button" onClick={() => setEditing(client)}>Edit Record</button>
+        </div>
+      </aside>
     </div>
   );
 }
