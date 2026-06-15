@@ -361,7 +361,6 @@ function routeFromLocation() {
     const hashRoute = location.hash.replace("#", "") || "home";
     const hashMatch = routes.find((item) => item.id === hashRoute);
     if (hashMatch) {
-      history.replaceState(null, "", hashMatch.path);
       return hashMatch.id;
     }
   }
@@ -371,7 +370,8 @@ function routeFromLocation() {
 }
 
 function pathForRoute(route) {
-  return routes.find((item) => item.id === route)?.path || "/";
+  const match = routes.find((item) => item.id === route);
+  return match?.id === "home" ? "/" : `/#${match?.id || "home"}`;
 }
 
 function App() {
@@ -420,7 +420,8 @@ function App() {
   function navigate(nextRoute) {
     setMenuOpen(false);
     const nextPath = pathForRoute(nextRoute);
-    if (location.pathname !== nextPath) {
+    const currentPath = `${location.pathname}${location.hash}`;
+    if (currentPath !== nextPath) {
       history.pushState(null, "", nextPath);
     }
     setRoute(nextRoute);
@@ -689,7 +690,7 @@ function RequestPage({ setRequests, navigate }) {
             <textarea name="note" rows="6" placeholder="Age range, concern, referral reason, preferred contact time, or relevant background." />
           </label>
           <div className="form-footer wide">
-            <button className="button primary" type="submit">
+            <button className="button primary" type="submit" disabled={submitting} aria-busy={submitting}>
               {submitting ? "Submitting..." : "Submit Request"} <ArrowRight size={18} />
             </button>
             <button className="button ghost" type="button" onClick={() => navigate("contact")}>
@@ -741,7 +742,7 @@ function ResultPage({ clients, navigate }) {
             Result password
             <input name="password" type="password" required />
           </label>
-          <button className="button primary" type="submit">
+          <button className="button primary" type="submit" disabled={checking} aria-busy={checking}>
             {checking ? "Checking..." : "Check Result"} <Search size={18} />
           </button>
           <p className="form-message" role="status">{message}</p>
@@ -886,10 +887,10 @@ function AdminLogin({ navigate, setSession }) {
           Password
           <input name="password" type="password" autoComplete="current-password" required />
         </label>
-        <button className="button primary" type="submit">
+        <button className="button primary" type="submit" disabled={submitting} aria-busy={submitting}>
           {submitting ? "Signing in..." : "Sign In"} <LockKeyhole size={18} />
         </button>
-        <button className="button ghost" type="button" onClick={() => navigate("home")}>
+        <button className="button ghost" type="button" onClick={() => navigate("home")} disabled={submitting}>
           Public Site
         </button>
         <p className="form-message" role="status">{message}</p>
@@ -907,6 +908,16 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate, sessi
   const [clientMessage, setClientMessage] = useState("");
   const [adminMessage, setAdminMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [savingClient, setSavingClient] = useState(false);
+  const [pendingActions, setPendingActions] = useState({});
+
+  function isPending(key) {
+    return Boolean(pendingActions[key]);
+  }
+
+  function setPending(key, value) {
+    setPendingActions((items) => ({ ...items, [key]: value }));
+  }
 
   useEffect(() => {
     if (supabaseEnabled && !session) return;
@@ -955,11 +966,13 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate, sessi
 
   async function saveClient(event) {
     event.preventDefault();
+    if (savingClient) return;
     const form = event.currentTarget;
     const data = Object.fromEntries(new FormData(form).entries());
     const file = form.pdf.files[0];
     const existing = clients.find((client) => client.id === data.id);
     setClientMessage("");
+    setSavingClient(true);
     try {
       const record = await saveClientRecord(data, file, existing);
       setClients((items) => (data.id ? items.map((item) => (item.id === data.id ? record : item)) : [record, ...items]));
@@ -968,47 +981,67 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate, sessi
       form.reset();
     } catch (error) {
       setClientMessage(error.message || "Could not save client record.");
+    } finally {
+      setSavingClient(false);
     }
   }
 
   async function updateRequest(id, status) {
+    const key = `request-status-${id}`;
+    if (isPending(key)) return;
     const previous = requests;
+    setPending(key, true);
     setRequests((items) => items.map((item) => (item.id === id ? { ...item, status } : item)));
     try {
       await updateRequestStatus(id, status);
     } catch (error) {
       setRequests(previous);
       setAdminMessage(error.message || "Could not update request.");
+    } finally {
+      setPending(key, false);
     }
   }
 
   async function deleteRequest(id) {
+    const key = `request-delete-${id}`;
+    if (isPending(key)) return;
     const previous = requests;
+    setPending(key, true);
     setRequests((items) => items.filter((item) => item.id !== id));
     try {
       await deleteRequestRecord(id);
     } catch (error) {
       setRequests(previous);
       setAdminMessage(error.message || "Could not delete request.");
+    } finally {
+      setPending(key, false);
     }
   }
 
   async function deleteClient(client) {
+    const key = `client-delete-${client.id}`;
+    if (isPending(key)) return;
     const previous = clients;
+    setPending(key, true);
     setClients((items) => items.filter((item) => item.id !== client.id));
     try {
       await deleteClientRecord(client);
     } catch (error) {
       setClients(previous);
       setAdminMessage(error.message || "Could not delete client record.");
+    } finally {
+      setPending(key, false);
     }
   }
 
   async function signOut() {
+    if (isPending("sign-out")) return;
+    setPending("sign-out", true);
     if (supabaseEnabled) {
       await supabase.auth.signOut();
     }
     setSession(null);
+    setPending("sign-out", false);
   }
 
   function openAdminView(nextView) {
@@ -1047,8 +1080,8 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate, sessi
           Public Site
         </button>
         {supabaseEnabled && (
-          <button className="button ghost" type="button" onClick={signOut}>
-            Sign Out
+          <button className="button ghost" type="button" onClick={signOut} disabled={isPending("sign-out")} aria-busy={isPending("sign-out")}>
+            {isPending("sign-out") ? "Signing Out..." : "Sign Out"}
           </button>
         )}
       </aside>
@@ -1119,14 +1152,14 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate, sessi
         {view === "requests" && (
           <section className="surface board-panel">
             <BoardHeader title="Request queue" eyebrow="Requests" value={requestSearch} onChange={setRequestSearch} placeholder="Search requests" />
-            <RequestBoard requests={filteredRequests} updateRequest={updateRequest} deleteRequest={deleteRequest} />
+            <RequestWorkspace requests={filteredRequests} updateRequest={updateRequest} deleteRequest={deleteRequest} isPending={isPending} />
           </section>
         )}
 
         {view === "clients" && (
           <section className="surface table-panel">
             <BoardHeader title="Client records" eyebrow="Records" value={clientSearch} onChange={setClientSearch} placeholder="Search clients" />
-            <ClientTable clients={filteredClients} deleteClient={deleteClient} setEditing={(client) => {
+            <ClientTable clients={filteredClients} deleteClient={deleteClient} isPending={isPending} setEditing={(client) => {
               setEditing(client);
               setView("reports");
             }} />
@@ -1135,10 +1168,10 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate, sessi
 
         {view === "reports" && (
           <section className="admin-workspace">
-            <RecordForm editing={editing} setEditing={setEditing} saveClient={saveClient} clientMessage={clientMessage} setClientMessage={setClientMessage} />
+            <RecordForm editing={editing} setEditing={setEditing} saveClient={saveClient} savingClient={savingClient} clientMessage={clientMessage} setClientMessage={setClientMessage} />
             <section className="surface table-panel">
               <BoardHeader title="Recent report records" eyebrow="Reports" value={clientSearch} onChange={setClientSearch} placeholder="Search records" />
-              <ClientTable clients={filteredClients} deleteClient={deleteClient} setEditing={setEditing} />
+              <ClientTable clients={filteredClients} deleteClient={deleteClient} isPending={isPending} setEditing={setEditing} />
             </section>
           </section>
         )}
@@ -1162,7 +1195,131 @@ function BoardHeader({ title, eyebrow, value, onChange, placeholder }) {
   );
 }
 
-function RequestBoard({ requests, updateRequest, deleteRequest, compact = false }) {
+function RequestWorkspace({ requests, updateRequest, deleteRequest, isPending }) {
+  const sortedRequests = useMemo(() => {
+    return [...requests].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }, [requests]);
+  const [selectedId, setSelectedId] = useState(sortedRequests[0]?.id || "");
+  const selected = sortedRequests.find((request) => request.id === selectedId) || sortedRequests[0];
+  const columns = ["New", "Contacted", "Scheduled", "Completed"];
+
+  useEffect(() => {
+    if (!sortedRequests.length) {
+      setSelectedId("");
+      return;
+    }
+
+    if (!sortedRequests.some((request) => request.id === selectedId)) {
+      setSelectedId(sortedRequests[0].id);
+    }
+  }, [sortedRequests, selectedId]);
+
+  if (!sortedRequests.length) {
+    return <p className="empty-note">No requests found.</p>;
+  }
+
+  return (
+    <div className="request-workspace">
+      <section className="recent-requests-panel" aria-label="Most recent requests">
+        <div className="request-section-title">
+          <strong>Most recent</strong>
+          <span>{sortedRequests.length} total</span>
+        </div>
+        <div className="recent-request-scroll">
+          {sortedRequests.slice(0, 12).map((request) => (
+            <button
+              className={`recent-request-card ${selected?.id === request.id ? "active" : ""}`}
+              key={request.id}
+              type="button"
+              onClick={() => setSelectedId(request.id)}
+            >
+              <span className={`status ${request.status === "Completed" ? "ready" : ""}`}>{request.status}</span>
+              <strong>{request.name}</strong>
+              <small>{request.service}</small>
+              <time>{formatDate(request.createdAt)}</time>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="request-detail-layout">
+        <div className="request-history-panel">
+          <div className="request-section-title">
+            <strong>All requests over time</strong>
+            <span>Click a row to expand</span>
+          </div>
+          <div className="request-history-list">
+            {sortedRequests.map((request) => (
+              <button
+                className={`request-history-row ${selected?.id === request.id ? "active" : ""}`}
+                key={request.id}
+                type="button"
+                onClick={() => setSelectedId(request.id)}
+              >
+                <strong>{request.name}</strong>
+                <span>{request.service}</span>
+                <span>{request.phone}</span>
+                <time>{formatDate(request.createdAt)}</time>
+                <i>{request.status}</i>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {selected && (
+          <aside className="request-expanded-panel">
+            <div className="request-expanded-head">
+              <span className={`status ${selected.status === "Completed" ? "ready" : ""}`}>{selected.status}</span>
+              <time>{formatDate(selected.createdAt)}</time>
+            </div>
+            <h3>{selected.name}</h3>
+            <dl>
+              <div>
+                <dt>Service</dt>
+                <dd>{selected.service}</dd>
+              </div>
+              <div>
+                <dt>Client type</dt>
+                <dd>{selected.clientType}</dd>
+              </div>
+              <div>
+                <dt>Priority</dt>
+                <dd>{selected.urgency || "Routine"}</dd>
+              </div>
+              <div>
+                <dt>Contact</dt>
+                <dd>{selected.email}<br />{selected.phone}</dd>
+              </div>
+            </dl>
+            {selected.note && <blockquote>{selected.note}</blockquote>}
+            <div className="request-expanded-actions">
+              <select
+                value={selected.status}
+                onChange={(event) => updateRequest(selected.id, event.target.value)}
+                disabled={isPending(`request-status-${selected.id}`)}
+              >
+                {columns.map((status) => (
+                  <option key={status}>{status}</option>
+                ))}
+              </select>
+              <button
+                className="mini-button danger"
+                type="button"
+                onClick={() => deleteRequest(selected.id)}
+                disabled={isPending(`request-delete-${selected.id}`)}
+                aria-busy={isPending(`request-delete-${selected.id}`)}
+              >
+                <Trash2 size={14} /> {isPending(`request-delete-${selected.id}`) ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </aside>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function RequestBoard({ requests, updateRequest, deleteRequest, isPending = () => false, compact = false }) {
   const columns = ["New", "Contacted", "Scheduled", "Completed"];
   return (
     <div className={`kanban ${compact ? "compact" : ""}`}>
@@ -1184,12 +1341,22 @@ function RequestBoard({ requests, updateRequest, deleteRequest, compact = false 
                 <p>{request.email} / {request.phone}</p>
                 {request.note && <blockquote>{request.note}</blockquote>}
                 <div className="request-actions">
-                  <select value={request.status} onChange={(event) => updateRequest(request.id, event.target.value)}>
+                  <select
+                    value={request.status}
+                    onChange={(event) => updateRequest(request.id, event.target.value)}
+                    disabled={isPending(`request-status-${request.id}`)}
+                  >
                     {columns.map((status) => (
                       <option key={status}>{status}</option>
                     ))}
                   </select>
-                  <button className="mini-button danger" type="button" onClick={() => deleteRequest(request.id)}>
+                  <button
+                    className="mini-button danger"
+                    type="button"
+                    onClick={() => deleteRequest(request.id)}
+                    disabled={isPending(`request-delete-${request.id}`)}
+                    aria-busy={isPending(`request-delete-${request.id}`)}
+                  >
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -1203,7 +1370,7 @@ function RequestBoard({ requests, updateRequest, deleteRequest, compact = false 
   );
 }
 
-function RecordForm({ editing, setEditing, saveClient, clientMessage, setClientMessage }) {
+function RecordForm({ editing, setEditing, saveClient, savingClient, clientMessage, setClientMessage }) {
   return (
     <form className="surface record-form" onSubmit={saveClient}>
       <input type="hidden" name="id" value={editing?.id || ""} readOnly />
@@ -1242,12 +1409,13 @@ function RecordForm({ editing, setEditing, saveClient, clientMessage, setClientM
         </label>
       </div>
       <div className="form-footer">
-        <button className="button primary" type="submit">
-          <Upload size={18} /> Save Record
+        <button className="button primary" type="submit" disabled={savingClient} aria-busy={savingClient}>
+          <Upload size={18} /> {savingClient ? "Saving..." : "Save Record"}
         </button>
         <button
           className="button ghost"
           type="button"
+          disabled={savingClient}
           onClick={() => {
             setEditing(null);
             setClientMessage("");
@@ -1261,7 +1429,7 @@ function RecordForm({ editing, setEditing, saveClient, clientMessage, setClientM
   );
 }
 
-function ClientTable({ clients, deleteClient, setEditing }) {
+function ClientTable({ clients, deleteClient, isPending = () => false, setEditing }) {
   const [openingId, setOpeningId] = useState("");
 
   async function openReport(client) {
@@ -1315,9 +1483,15 @@ function ClientTable({ clients, deleteClient, setEditing }) {
                 </td>
                 <td>
                   <div className="row-actions">
-                    <button className="mini-button" type="button" onClick={() => setEditing(client)}>Edit</button>
-                    <button className="mini-button danger" type="button" onClick={() => deleteClient(client)}>
-                      <Trash2 size={14} /> Delete
+                    <button className="mini-button" type="button" onClick={() => setEditing(client)} disabled={isPending(`client-delete-${client.id}`)}>Edit</button>
+                    <button
+                      className="mini-button danger"
+                      type="button"
+                      onClick={() => deleteClient(client)}
+                      disabled={isPending(`client-delete-${client.id}`)}
+                      aria-busy={isPending(`client-delete-${client.id}`)}
+                    >
+                      <Trash2 size={14} /> {isPending(`client-delete-${client.id}`) ? "Deleting..." : "Delete"}
                     </button>
                   </div>
                 </td>
