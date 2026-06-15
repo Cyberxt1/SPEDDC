@@ -5361,3 +5361,176 @@ tr:hover td {
     padding: 0 10px;
   }
 }
+
+/* Tablet, mini-tablet, and small laptop polish. */
+@media (min-width: 681px) and (max-width: 1180px) {
+  .site-header,
+  .header-main {
+    gap: 14px;
+  }
+
+  .brand strong,
+  .admin-brand strong {
+    max-width: 300px;
+  }
+
+  .site-nav {
+    gap: 2px;
+  }
+
+  .site-nav button {
+    min-height: 38px;
+    padding-inline: 10px;
+    font-size: 0.84rem;
+  }
+
+  .hero-redesign {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: auto;
+    padding: 48px 28px 56px;
+  }
+
+  .hero-redesign h1 {
+    max-width: 780px;
+    font-size: clamp(2.45rem, 7vw, 4.1rem);
+  }
+
+  .hero-quick-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: min(760px, 100%);
+  }
+
+  .hero-trust-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .services-redesign,
+  .split-redesign {
+    width: min(100% - 40px, 1180px);
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .services-redesign .design-heading,
+  .split-redesign > div:first-child {
+    position: static;
+    max-width: 760px;
+  }
+
+  .services-redesign-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .services-redesign-grid article,
+  .services-redesign-grid article:nth-child(1),
+  .services-redesign-grid article:nth-child(2) {
+    min-height: 198px;
+    padding: 20px;
+  }
+
+  .audience-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .report-band {
+    width: min(100% - 40px, 1180px);
+    min-height: 300px;
+  }
+
+  .contact-grid,
+  .metric-grid,
+  .focus-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ops-page {
+    --sidebar-width: 248px;
+  }
+
+  .ops-main {
+    padding-inline: 18px;
+  }
+
+  .ops-title-block span,
+  .ops-strip time {
+    display: none;
+  }
+
+  .record-form .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kanban {
+    grid-template-columns: repeat(2, minmax(260px, 1fr));
+  }
+
+  .request-detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .request-expanded-panel {
+    position: static;
+  }
+
+  .request-history-row {
+    grid-template-columns: minmax(120px, 1fr) minmax(110px, 0.8fr) minmax(90px, 0.7fr) auto;
+  }
+
+  .request-history-row time {
+    display: none;
+  }
+
+  .footer-top {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .footer-brand {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 681px) and (max-width: 860px) {
+  .site-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .header-main {
+    width: 100%;
+  }
+
+  .site-nav {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .hero-trust-strip,
+  .services-redesign-grid,
+  .audience-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .services-redesign-grid article,
+  .services-redesign-grid article:nth-child(1),
+  .services-redesign-grid article:nth-child(2) {
+    min-height: 186px;
+  }
+
+  .result-layout {
+    grid-template-columns: minmax(0, 520px);
+  }
+}
+
+@media (min-width: 981px) and (max-width: 1180px) {
+  .ops-header-actions {
+    display: none;
+  }
+
+  .record-form .form-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .request-detail-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.45fr);
+  }
+}
