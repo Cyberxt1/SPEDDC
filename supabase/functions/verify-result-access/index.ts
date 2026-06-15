@@ -9,9 +9,9 @@ const corsHeaders = {
 const MAX_DIRECT_ACCESS = 5;
 const TOKEN_TTL_HOURS = 24;
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "https://gzaalqhcmmtksvlneics.supabase.co";
-const serviceRoleKey = Deno.env.get("SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const resendApiKey = Deno.env.get("RESEND_API_KEY") ?? "";
-const fromEmail = Deno.env.get("RESULTS_FROM_EMAIL") ?? "Results Desk <onboarding@resend.dev>";
+const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "").trim();
+const resendApiKey = (Deno.env.get("RESEND_API_KEY") ?? "").trim();
+const fromEmail = (Deno.env.get("RESULTS_FROM_EMAIL") ?? "Results Desk <onboarding@resend.dev>").trim();
 
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false }

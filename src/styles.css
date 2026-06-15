@@ -1121,6 +1121,28 @@ footer p {
   width: 100%;
 }
 
+.admin-loading-card {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  width: min(520px, 100%);
+  margin: 0 auto;
+  padding: 28px;
+}
+
+.admin-loading-card svg {
+  color: var(--brand);
+}
+
+.admin-loading-card h1 {
+  font-size: 1.45rem;
+}
+
+.admin-loading-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
 .process-panel {
   display: grid;
   gap: 12px;

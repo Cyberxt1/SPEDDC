@@ -137,6 +137,10 @@ function normalize(value) {
 
 function userErrorMessage(error, fallback) {
   const message = error?.message || "";
+  const contextMessage = error?.context?.error || error?.context?.message || "";
+  if (contextMessage) {
+    return contextMessage;
+  }
   if (message.toLowerCase().includes("edge function")) {
     return "Result download service is not active yet. Please contact the center so staff can enable report access.";
   }
@@ -438,6 +442,7 @@ function App() {
   const [requests, setRequests] = useState(() => (supabaseEnabled ? [] : load(STORAGE.requests, [])));
   const [clientLogs, setClientLogs] = useState(() => (supabaseEnabled ? [] : load(STORAGE.clientLogs, [])));
   const [session, setSession] = useState(null);
+  const [authReady, setAuthReady] = useState(!supabaseEnabled);
 
   useEffect(() => {
     const onPop = () => setRoute(routeFromLocation());
@@ -467,12 +472,18 @@ function App() {
     if (!supabaseEnabled) return;
     let active = true;
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (active) setSession(data.session);
-    });
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if (!active) return;
+        setSession(data.session);
+      })
+      .finally(() => {
+        if (active) setAuthReady(true);
+      });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
+      setAuthReady(true);
     });
 
     return () => {
@@ -512,6 +523,7 @@ function App() {
             setClientLogs={setClientLogs}
             navigate={navigate}
             session={session}
+            authReady={authReady}
             setSession={setSession}
           />
         )}
@@ -963,7 +975,13 @@ function AdminLogin({ navigate, setSession }) {
       });
 
       if (error) throw error;
-      setSession(authData.session);
+      if (authData.session) {
+        setSession(authData.session);
+        return;
+      }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      setSession(sessionData.session);
     } catch (error) {
       setMessage(error.message || "Could not sign in.");
     } finally {
@@ -999,7 +1017,22 @@ function AdminLogin({ navigate, setSession }) {
   );
 }
 
-function AdminPage({ clients, setClients, requests, setRequests, clientLogs, setClientLogs, navigate, session, setSession }) {
+function AdminLoading({ navigate }) {
+  return (
+    <section className="app-page admin-login-page">
+      <div className="surface lookup-card admin-loading-card">
+        <LockKeyhole size={26} />
+        <h1>Loading workspace</h1>
+        <p>Checking your staff session and preparing admin records.</p>
+        <button className="button ghost" type="button" onClick={() => navigate("home")}>
+          Public Site
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function AdminPage({ clients, setClients, requests, setRequests, clientLogs, setClientLogs, navigate, session, authReady, setSession }) {
   const [view, setView] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia("(min-width: 981px)").matches);
   const [clientSearch, setClientSearch] = useState("");
@@ -1042,6 +1075,10 @@ function AdminPage({ clients, setClients, requests, setRequests, clientLogs, set
       active = false;
     };
   }, [session, setClients, setRequests, setClientLogs]);
+
+  if (supabaseEnabled && !authReady) {
+    return <AdminLoading navigate={navigate} />;
+  }
 
   if (supabaseEnabled && !session) {
     return <AdminLogin navigate={navigate} setSession={setSession} />;
