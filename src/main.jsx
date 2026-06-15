@@ -36,7 +36,8 @@ const REPORT_TTL_DAYS = 30;
 
 const STORAGE = {
   clients: "sndtc_clients",
-  requests: "sndtc_requests"
+  requests: "sndtc_requests",
+  clientLogs: "sndtc_client_logs"
 };
 
 const routes = [
@@ -134,6 +135,14 @@ function normalize(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function userErrorMessage(error, fallback) {
+  const message = error?.message || "";
+  if (message.toLowerCase().includes("edge function")) {
+    return "Result download service is not active yet. Please contact the center so staff can enable report access.";
+  }
+  return message || fallback;
+}
+
 function makeId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
@@ -194,6 +203,19 @@ function toClient(row) {
   };
 }
 
+function toClientLog(row) {
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    action: row.action,
+    clientName: row.client_name,
+    clientPhone: row.client_phone,
+    createdAt: row.created_at,
+    oldData: row.old_data,
+    newData: row.new_data
+  };
+}
+
 async function submitServiceRequest(data) {
   const request = {
     id: makeId("request"),
@@ -233,21 +255,29 @@ async function fetchAdminData() {
   if (!supabaseEnabled) {
     return {
       clients: load(STORAGE.clients, []),
-      requests: load(STORAGE.requests, [])
+      requests: load(STORAGE.requests, []),
+      clientLogs: load(STORAGE.clientLogs, [])
     };
   }
 
-  const [{ data: clients, error: clientsError }, { data: requests, error: requestsError }] = await Promise.all([
+  const [
+    { data: clients, error: clientsError },
+    { data: requests, error: requestsError },
+    { data: clientLogs, error: logsError }
+  ] = await Promise.all([
     supabase.from("clients").select("*").order("updated_at", { ascending: false }),
-    supabase.from("service_requests").select("*").order("created_at", { ascending: false })
+    supabase.from("service_requests").select("*").order("created_at", { ascending: false }),
+    supabase.from("client_logs").select("*").order("created_at", { ascending: false }).limit(100)
   ]);
 
   if (clientsError) throw clientsError;
   if (requestsError) throw requestsError;
+  if (logsError && logsError.code !== "42P01") throw logsError;
 
   return {
     clients: (clients || []).map(toClient),
-    requests: (requests || []).map(toRequest)
+    requests: (requests || []).map(toRequest),
+    clientLogs: logsError ? [] : (clientLogs || []).map(toClientLog)
   };
 }
 
@@ -356,6 +386,23 @@ async function verifyResult(phone, password, localClients) {
   return data?.record || null;
 }
 
+async function downloadFile(url, fileName) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error("Could not download the PDF file.");
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
 function routeFromLocation() {
   if (location.hash) {
     const hashRoute = location.hash.replace("#", "") || "home";
@@ -379,6 +426,7 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [clients, setClients] = useState(() => (supabaseEnabled ? [] : load(STORAGE.clients, [])));
   const [requests, setRequests] = useState(() => (supabaseEnabled ? [] : load(STORAGE.requests, [])));
+  const [clientLogs, setClientLogs] = useState(() => (supabaseEnabled ? [] : load(STORAGE.clientLogs, [])));
   const [session, setSession] = useState(null);
 
   useEffect(() => {
@@ -398,6 +446,12 @@ function App() {
       save(STORAGE.requests, requests);
     }
   }, [requests]);
+
+  useEffect(() => {
+    if (!supabaseEnabled) {
+      save(STORAGE.clientLogs, clientLogs);
+    }
+  }, [clientLogs]);
 
   useEffect(() => {
     if (!supabaseEnabled) return;
@@ -444,6 +498,8 @@ function App() {
             setClients={setClients}
             requests={requests}
             setRequests={setRequests}
+            clientLogs={clientLogs}
+            setClientLogs={setClientLogs}
             navigate={navigate}
             session={session}
             setSession={setSession}
@@ -719,7 +775,7 @@ function ResultPage({ clients, navigate }) {
       setResult(record || false);
     } catch (error) {
       setResult(false);
-      setMessage(error.message || "Could not check the result right now.");
+      setMessage(userErrorMessage(error, "Could not check the result right now."));
     } finally {
       setChecking(false);
     }
@@ -754,6 +810,24 @@ function ResultPage({ clients, navigate }) {
 }
 
 function ResultCard({ result, navigate }) {
+  const [downloading, setDownloading] = useState(false);
+  const [downloadMessage, setDownloadMessage] = useState("");
+
+  async function handleDownload() {
+    const url = result?.signedUrl || result?.pdfData;
+    if (!url || downloading) return;
+
+    setDownloading(true);
+    setDownloadMessage("");
+    try {
+      await downloadFile(url, result.reportName || `${safeFileName(result.name)}-result.pdf`);
+    } catch (error) {
+      setDownloadMessage(error.message || "Could not download the PDF.");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   if (result === null) {
     return (
       <aside className="result-card idle">
@@ -797,10 +871,11 @@ function ResultCard({ result, navigate }) {
         <a className="button primary" href={result.signedUrl || result.pdfData} target="_blank" rel="noreferrer">
           View PDF
         </a>
-        <a className="button ghost" href={result.signedUrl || result.pdfData} download={result.reportName || `${safeFileName(result.name)}-result.pdf`}>
-          Download
-        </a>
+        <button className="button ghost" type="button" onClick={handleDownload} disabled={downloading} aria-busy={downloading}>
+          {downloading ? "Downloading..." : "Download PDF"}
+        </button>
       </div>
+      <p className="form-message" role="status">{downloadMessage}</p>
     </aside>
   );
 }
@@ -899,7 +974,7 @@ function AdminLogin({ navigate, setSession }) {
   );
 }
 
-function AdminPage({ clients, setClients, requests, setRequests, navigate, session, setSession }) {
+function AdminPage({ clients, setClients, requests, setRequests, clientLogs, setClientLogs, navigate, session, setSession }) {
   const [view, setView] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia("(min-width: 981px)").matches);
   const [clientSearch, setClientSearch] = useState("");
@@ -928,6 +1003,7 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate, sessi
         if (!active) return;
         setClients(data.clients);
         setRequests(data.requests);
+        setClientLogs(data.clientLogs);
         setAdminMessage("");
       })
       .catch((error) => {
@@ -940,7 +1016,7 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate, sessi
     return () => {
       active = false;
     };
-  }, [session, setClients, setRequests]);
+  }, [session, setClients, setRequests, setClientLogs]);
 
   if (supabaseEnabled && !session) {
     return <AdminLogin navigate={navigate} setSession={setSession} />;
@@ -976,6 +1052,21 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate, sessi
     try {
       const record = await saveClientRecord(data, file, existing);
       setClients((items) => (data.id ? items.map((item) => (item.id === data.id ? record : item)) : [record, ...items]));
+      if (!supabaseEnabled) {
+        setClientLogs((items) => [
+          {
+            id: makeId("client-log"),
+            clientId: record.id,
+            action: data.id ? "updated" : "created",
+            clientName: record.name,
+            clientPhone: record.phone,
+            createdAt: new Date().toISOString()
+          },
+          ...items
+        ]);
+      } else {
+        fetchAdminData().then((data) => setClientLogs(data.clientLogs)).catch(() => {});
+      }
       setEditing(null);
       setClientMessage("Client result record saved.");
       form.reset();
@@ -1024,8 +1115,24 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate, sessi
     const previous = clients;
     setPending(key, true);
     setClients((items) => items.filter((item) => item.id !== client.id));
+    if (!supabaseEnabled) {
+      setClientLogs((items) => [
+        {
+          id: makeId("client-log"),
+          clientId: client.id,
+          action: "deleted",
+          clientName: client.name,
+          clientPhone: client.phone,
+          createdAt: new Date().toISOString()
+        },
+        ...items
+      ]);
+    }
     try {
       await deleteClientRecord(client);
+      if (supabaseEnabled) {
+        fetchAdminData().then((data) => setClientLogs(data.clientLogs)).catch(() => {});
+      }
     } catch (error) {
       setClients(previous);
       setAdminMessage(error.message || "Could not delete client record.");
@@ -1068,7 +1175,8 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate, sessi
             ["overview", "Overview", BarChart3],
             ["requests", "Request Queue", CalendarCheck],
             ["clients", "Client Records", UsersRound],
-            ["reports", "Report Setup", FileCheck2]
+            ["reports", "Report Setup", FileCheck2],
+            ["logs", "Client Logs", ClipboardCheck]
           ].map(([id, label, Icon]) => (
             <button className={view === id ? "active" : ""} key={id} type="button" onClick={() => openAdminView(id)}>
               <Icon size={18} />
@@ -1173,6 +1281,18 @@ function AdminPage({ clients, setClients, requests, setRequests, navigate, sessi
               <BoardHeader title="Recent report records" eyebrow="Reports" value={clientSearch} onChange={setClientSearch} placeholder="Search records" />
               <ClientTable clients={filteredClients} deleteClient={deleteClient} isPending={isPending} setEditing={setEditing} />
             </section>
+          </section>
+        )}
+
+        {view === "logs" && (
+          <section className="surface table-panel">
+            <div className="list-header">
+              <div>
+                <p className="eyebrow">Activity</p>
+                <h2>Client data log</h2>
+              </div>
+            </div>
+            <ClientLogList logs={clientLogs} />
           </section>
         )}
       </div>
@@ -1426,6 +1546,25 @@ function RecordForm({ editing, setEditing, saveClient, savingClient, clientMessa
       </div>
       <p className="form-message">{clientMessage}</p>
     </form>
+  );
+}
+
+function ClientLogList({ logs }) {
+  if (!logs.length) {
+    return <p className="empty-note">No client activity has been recorded yet.</p>;
+  }
+
+  return (
+    <div className="client-log-list">
+      {logs.map((log) => (
+        <article className="client-log-row" key={log.id}>
+          <span className={`log-action ${log.action}`}>{log.action}</span>
+          <strong>{log.clientName || "Unknown client"}</strong>
+          <span>{log.clientPhone || "No phone"}</span>
+          <time>{formatDate(log.createdAt)}</time>
+        </article>
+      ))}
+    </div>
   );
 }
 
