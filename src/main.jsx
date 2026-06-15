@@ -33,6 +33,7 @@ const supabaseEnabled = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 const supabase = supabaseEnabled ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 const REPORT_BUCKET = "reports";
 const REPORT_TTL_DAYS = 30;
+const MOBILE_CLIENT_PAGE_SIZE = 5;
 
 const STORAGE = {
   clients: "sndtc_clients",
@@ -265,33 +266,70 @@ async function submitServiceRequest(data) {
   return request;
 }
 
-async function fetchAdminData() {
+function defaultAdminCounts(clients = [], requests = []) {
+  return {
+    clients: clients.length,
+    ready: clients.filter((client) => client.status === "ready").length,
+    open: requests.filter((request) => request.status !== "Completed").length,
+    scheduled: requests.filter((request) => request.status === "Scheduled").length,
+    pdf: clients.length ? Math.round((clients.filter((client) => client.reportPath || client.pdfData).length / clients.length) * 100) : 0
+  };
+}
+
+async function fetchAdminData({ clientLimit = null } = {}) {
   if (!supabaseEnabled) {
+    const clients = load(STORAGE.clients, []);
+    const requests = load(STORAGE.requests, []);
     return {
-      clients: load(STORAGE.clients, []),
-      requests: load(STORAGE.requests, []),
-      clientLogs: load(STORAGE.clientLogs, [])
+      clients: clientLimit ? clients.slice(0, clientLimit) : clients,
+      requests,
+      clientLogs: load(STORAGE.clientLogs, []),
+      counts: defaultAdminCounts(clients, requests)
     };
+  }
+
+  let clientsQuery = supabase.from("clients").select("*").order("updated_at", { ascending: false });
+  if (clientLimit) {
+    clientsQuery = clientsQuery.limit(clientLimit);
   }
 
   const [
     { data: clients, error: clientsError },
     { data: requests, error: requestsError },
-    { data: clientLogs, error: logsError }
+    { data: clientLogs, error: logsError },
+    { count: clientCount, error: clientCountError },
+    { count: readyCount, error: readyCountError },
+    { count: reportCount, error: reportCountError }
   ] = await Promise.all([
-    supabase.from("clients").select("*").order("updated_at", { ascending: false }),
+    clientsQuery,
     supabase.from("service_requests").select("*").order("created_at", { ascending: false }),
-    supabase.from("client_logs").select("*").order("created_at", { ascending: false }).limit(100)
+    supabase.from("client_logs").select("*").order("created_at", { ascending: false }).limit(100),
+    supabase.from("clients").select("*", { count: "exact", head: true }),
+    supabase.from("clients").select("*", { count: "exact", head: true }).eq("status", "ready"),
+    supabase.from("clients").select("*", { count: "exact", head: true }).not("report_path", "is", null)
   ]);
 
   if (clientsError) throw clientsError;
   if (requestsError) throw requestsError;
   if (logsError && !isMissingTableError(logsError, "client_logs")) throw logsError;
+  if (clientCountError) throw clientCountError;
+  if (readyCountError) throw readyCountError;
+  if (reportCountError) throw reportCountError;
+
+  const mappedRequests = (requests || []).map(toRequest);
+  const totalClients = clientCount || 0;
 
   return {
     clients: (clients || []).map(toClient),
-    requests: (requests || []).map(toRequest),
-    clientLogs: logsError ? [] : (clientLogs || []).map(toClientLog)
+    requests: mappedRequests,
+    clientLogs: logsError ? [] : (clientLogs || []).map(toClientLog),
+    counts: {
+      clients: totalClients,
+      ready: readyCount || 0,
+      open: mappedRequests.filter((request) => request.status !== "Completed").length,
+      scheduled: mappedRequests.filter((request) => request.status === "Scheduled").length,
+      pdf: totalClients ? Math.round(((reportCount || 0) / totalClients) * 100) : 0
+    }
   };
 }
 
@@ -1053,6 +1091,9 @@ function AdminPage({ clients, setClients, requests, setRequests, clientLogs, set
   const [pendingActions, setPendingActions] = useState({});
   const [previewRequest, setPreviewRequest] = useState(null);
   const [previewClient, setPreviewClient] = useState(null);
+  const [isCompactRecords, setIsCompactRecords] = useState(() => window.matchMedia("(max-width: 680px)").matches);
+  const [clientLimit, setClientLimit] = useState(() => (window.matchMedia("(max-width: 680px)").matches ? MOBILE_CLIENT_PAGE_SIZE : null));
+  const [adminCounts, setAdminCounts] = useState(() => defaultAdminCounts(clients, requests));
 
   function isPending(key) {
     return Boolean(pendingActions[key]);
@@ -1063,15 +1104,31 @@ function AdminPage({ clients, setClients, requests, setRequests, clientLogs, set
   }
 
   useEffect(() => {
+    const query = window.matchMedia("(max-width: 680px)");
+    const sync = () => {
+      setIsCompactRecords(query.matches);
+      setClientLimit((limit) => {
+        if (query.matches) return limit || MOBILE_CLIENT_PAGE_SIZE;
+        return null;
+      });
+    };
+
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
     if (supabaseEnabled && !session) return;
     let active = true;
     setLoading(true);
-    fetchAdminData()
+    fetchAdminData({ clientLimit })
       .then((data) => {
         if (!active) return;
         setClients(data.clients);
         setRequests(data.requests);
         setClientLogs(data.clientLogs);
+        setAdminCounts(data.counts);
         setAdminMessage("");
       })
       .catch((error) => {
@@ -1084,15 +1141,17 @@ function AdminPage({ clients, setClients, requests, setRequests, clientLogs, set
     return () => {
       active = false;
     };
-  }, [session, setClients, setRequests, setClientLogs]);
+  }, [session, clientLimit, setClients, setRequests, setClientLogs]);
 
   const stats = useMemo(() => {
-    const ready = clients.filter((client) => client.status === "ready").length;
-    const open = requests.filter((request) => request.status !== "Completed").length;
-    const scheduled = requests.filter((request) => request.status === "Scheduled").length;
-    const pdf = clients.length ? Math.round((clients.filter((client) => client.reportPath || client.pdfData).length / clients.length) * 100) : 0;
-    return { ready, open, scheduled, pdf };
-  }, [clients, requests]);
+    return {
+      ready: adminCounts.ready,
+      open: adminCounts.open,
+      scheduled: adminCounts.scheduled,
+      pdf: adminCounts.pdf,
+      clients: adminCounts.clients
+    };
+  }, [adminCounts]);
 
   const filteredClients = clients.filter((client) =>
     [client.name, client.email, client.phone, client.status].some((value) => normalize(value).includes(normalize(clientSearch)))
@@ -1137,7 +1196,10 @@ function AdminPage({ clients, setClients, requests, setRequests, clientLogs, set
           ...items
         ]);
       } else {
-        fetchAdminData().then((data) => setClientLogs(data.clientLogs)).catch(() => {});
+        fetchAdminData({ clientLimit }).then((data) => {
+          setClientLogs(data.clientLogs);
+          setAdminCounts(data.counts);
+        }).catch(() => {});
       }
       setEditing(null);
       setClientMessage("Client result record saved.");
@@ -1203,7 +1265,10 @@ function AdminPage({ clients, setClients, requests, setRequests, clientLogs, set
     try {
       await deleteClientRecord(client);
       if (supabaseEnabled) {
-        fetchAdminData().then((data) => setClientLogs(data.clientLogs)).catch(() => {});
+        fetchAdminData({ clientLimit }).then((data) => {
+          setClientLogs(data.clientLogs);
+          setAdminCounts(data.counts);
+        }).catch(() => {});
       }
     } catch (error) {
       setClients(previous);
@@ -1226,6 +1291,10 @@ function AdminPage({ clients, setClients, requests, setRequests, clientLogs, set
   function openAdminView(nextView) {
     setView(nextView);
     setSidebarOpen(false);
+  }
+
+  function loadMoreClients() {
+    setClientLimit((limit) => (limit || MOBILE_CLIENT_PAGE_SIZE) + MOBILE_CLIENT_PAGE_SIZE);
   }
 
   return (
@@ -1292,7 +1361,7 @@ function AdminPage({ clients, setClients, requests, setRequests, clientLogs, set
         </header>
 
         <section className="metric-grid">
-          <Metric icon={UsersRound} label="Client records" value={clients.length} />
+          <Metric icon={UsersRound} label="Client records" value={stats.clients} />
           <Metric icon={FileCheck2} label="Ready reports" value={stats.ready} />
           <Metric icon={CalendarCheck} label="Open requests" value={stats.open} />
           <Metric icon={BarChart3} label="PDF coverage" value={`${stats.pdf}%`} />
@@ -1318,6 +1387,13 @@ function AdminPage({ clients, setClients, requests, setRequests, clientLogs, set
               setEditing(client);
               setView("reports");
             }} />
+            {isCompactRecords && clients.length < stats.clients && (
+              <div className="load-more-row">
+                <button className="button ghost" type="button" onClick={loadMoreClients} disabled={loading}>
+                  {loading ? "Loading..." : `Load more (${clients.length}/${stats.clients})`}
+                </button>
+              </div>
+            )}
           </section>
         )}
 
@@ -1327,6 +1403,13 @@ function AdminPage({ clients, setClients, requests, setRequests, clientLogs, set
             <section className="surface table-panel">
               <BoardHeader title="Recent report records" eyebrow="Reports" value={clientSearch} onChange={setClientSearch} placeholder="Search records" />
               <ClientTable clients={filteredClients} deleteClient={deleteClient} isPending={isPending} onOpenClient={setPreviewClient} setEditing={setEditing} />
+              {isCompactRecords && clients.length < stats.clients && (
+                <div className="load-more-row">
+                  <button className="button ghost" type="button" onClick={loadMoreClients} disabled={loading}>
+                    {loading ? "Loading..." : `Load more (${clients.length}/${stats.clients})`}
+                  </button>
+                </div>
+              )}
             </section>
           </section>
         )}

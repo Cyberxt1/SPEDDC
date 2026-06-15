@@ -6371,6 +6371,16 @@ tr:hover td {
   font-weight: 800;
 }
 
+.load-more-row {
+  display: flex;
+  justify-content: center;
+  padding-top: 12px;
+}
+
+.load-more-row .button {
+  min-width: min(220px, 100%);
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
