@@ -143,6 +143,16 @@ function userErrorMessage(error, fallback) {
   return message || fallback;
 }
 
+function isMissingTableError(error, tableName) {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    error?.code === "42P01" ||
+    error?.code === "PGRST205" ||
+    error?.code === "PGRST204" ||
+    (message.includes(tableName) && (message.includes("schema cache") || message.includes("could not find")))
+  );
+}
+
 function makeId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
@@ -272,7 +282,7 @@ async function fetchAdminData() {
 
   if (clientsError) throw clientsError;
   if (requestsError) throw requestsError;
-  if (logsError && logsError.code !== "42P01") throw logsError;
+  if (logsError && !isMissingTableError(logsError, "client_logs")) throw logsError;
 
   return {
     clients: (clients || []).map(toClient),
@@ -560,7 +570,7 @@ function Home({ navigate }) {
         <div className="hero-redesign-copy" key={activeMessage.language}>
           <h1>Special Needs Diagnosis and Therapy Center</h1>
           <p className="hero-lede">
-            A calm, professional center for assessment, therapy, consultation, family guidance, and secure report access.
+             {/* Center for assessment, therapy, consultation, family guidance, and secure report access. */}
           </p>
 
           <div className="language-card">
@@ -618,7 +628,7 @@ function Home({ navigate }) {
           </article>
           <article>
             <strong>Consultation</strong>
-            <span>Guidance for families, schools, and organizations</span>
+            <span>Guidance for individuals, families, schools, and organizations</span>
           </article>
         </div>
       </section>
@@ -847,6 +857,21 @@ function ResultCard({ result, navigate }) {
         <button className="button ghost" type="button" onClick={() => navigate("request")}>
           Submit Request
         </button>
+      </aside>
+    );
+  }
+
+  if (result.accessLimited || result.status === "limited") {
+    return (
+      <aside className="result-card">
+        <Mail size={30} />
+        <h2>Result access limit reached</h2>
+        <p>
+          Result access has exceeded the limit. Check your email address for a secure download link to continue or contact the system administrator.
+        </p>
+        {result.emailSent === false && (
+          <p>The email could not be sent automatically. Please contact the center for support.</p>
+        )}
       </aside>
     );
   }
